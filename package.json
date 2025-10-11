@@ -5,6 +5,10 @@
   "version": "0.2.2",
   "publisher": "felixsebastian",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felixsebastian/zapper-vscode.git"
+  },
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.74.0"
