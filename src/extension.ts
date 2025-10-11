@@ -9,6 +9,11 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.commands.registerCommand('zapper.refresh', () => {
     provider.refresh();
   });
+
+  // Clean up polling when extension deactivates
+  context.subscriptions.push({
+    dispose: () => provider.dispose()
+  });
 }
 
 export function deactivate() {}
