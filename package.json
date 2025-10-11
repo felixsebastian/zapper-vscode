@@ -3,6 +3,7 @@
   "displayName": "Zapper",
   "description": "VS Code extension for managing local development with zapper CLI",
   "version": "0.0.1",
+  "publisher": "felixsebastian",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -33,11 +34,15 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "build": "npm run compile",
+    "package": "vsce package",
+    "install-extension": "code --install-extension zapper-vscode-0.0.1.vsix"
   },
   "devDependencies": {
     "@types/vscode": "^1.74.0",
     "@types/node": "16.x",
-    "typescript": "^4.9.4"
+    "typescript": "^4.9.4",
+    "@vscode/vsce": "^2.19.0"
   }
 }
