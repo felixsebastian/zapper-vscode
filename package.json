@@ -4,6 +4,7 @@
   "description": "VS Code extension for managing local development with zapper CLI",
   "version": "0.2.0",
   "publisher": "felixsebastian",
+  "license": "MIT",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.74.0"
