@@ -2,7 +2,7 @@
   "name": "zapper-vscode",
   "displayName": "Zapper",
   "description": "VS Code extension for managing local development with zapper CLI",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "felixsebastian",
   "license": "MIT",
   "icon": "icon.png",
