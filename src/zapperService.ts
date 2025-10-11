@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ZapperStatus } from './types';
+import { ZapperStatus, ZapperStatusSchema } from './types';
 
 export async function executeZapCommand(command: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -30,8 +30,17 @@ export async function executeZapCommand(command: string): Promise<string> {
 export async function getZapperStatus(): Promise<ZapperStatus | null> {
   try {
     const output = await executeZapCommand('ps --json');
-    const status = JSON.parse(output) as ZapperStatus;
-    return status;
+    const rawData = JSON.parse(output);
+    
+    // Validate the data with Zod
+    const validationResult = ZapperStatusSchema.safeParse(rawData);
+    
+    if (!validationResult.success) {
+      console.error('Invalid zapper status data:', validationResult.error);
+      return null;
+    }
+    
+    return validationResult.data;
   } catch (error) {
     console.error('Failed to get zapper status:', error);
     return null;

@@ -24,7 +24,7 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
     try {
       const zapperStatus = await getZapperStatus();
       if (zapperStatus) {
-        this.status = [...zapperStatus.processes, ...zapperStatus.containers];
+        this.status = [...zapperStatus.bareMetal, ...zapperStatus.docker];
         this._onDidChangeTreeData.fire();
       }
     } catch (error) {
