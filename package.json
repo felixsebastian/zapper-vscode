@@ -2,7 +2,7 @@
   "name": "zapper-vscode",
   "displayName": "Zapper",
   "description": "VS Code extension for managing local development with zapper CLI",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "felixsebastian",
   "icon": "icon.png",
   "engines": {
@@ -12,12 +12,21 @@
     "Other"
   ],
   "activationEvents": [
-    "onView:zapperView"
+    "*"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "zapper",
+          "title": "Zapper",
+          "icon": "$(zap)"
+        }
+      ]
+    },
     "views": {
-      "explorer": [
+      "zapper": [
         {
           "id": "zapperView",
           "name": "Zapper"
@@ -29,8 +38,99 @@
         "command": "zapper.refresh",
         "title": "Refresh",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "zapper.start",
+        "title": "Start"
+      },
+      {
+        "command": "zapper.stop",
+        "title": "Stop"
+      },
+      {
+        "command": "zapper.restart",
+        "title": "Restart"
+      },
+      {
+        "command": "zapper.runTask",
+        "title": "Run"
+      },
+      {
+        "command": "zapper.startAll",
+        "title": "Start All",
+        "icon": "$(play)"
+      },
+      {
+        "command": "zapper.stopAll",
+        "title": "Stop All",
+        "icon": "$(primitive-square)"
+      },
+      {
+        "command": "zapper.restartAll",
+        "title": "Restart All",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "zapper.openLogs",
+        "title": "Logs"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "zapper.startAll",
+          "when": "view == zapperView",
+          "group": "navigation"
+        },
+        {
+          "command": "zapper.stopAll",
+          "when": "view == zapperView",
+          "group": "navigation"
+        },
+        {
+          "command": "zapper.restartAll",
+          "when": "view == zapperView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "zapper.start",
+          "when": "viewItem == service-stopped",
+          "group": "inline"
+        },
+        {
+          "command": "zapper.stop",
+          "when": "viewItem == service-running",
+          "group": "inline"
+        },
+        {
+          "command": "zapper.restart",
+          "when": "viewItem == service-running",
+          "group": "inline"
+        },
+        {
+          "command": "zapper.openLogs",
+          "when": "viewItem == service-running",
+          "group": "inline"
+        },
+        {
+          "command": "zapper.startAll",
+          "when": "viewItem == project",
+          "group": "inline"
+        },
+        {
+          "command": "zapper.stopAll",
+          "when": "viewItem == project",
+          "group": "inline"
+        },
+        {
+          "command": "zapper.restartAll",
+          "when": "viewItem == project",
+          "group": "inline"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -40,11 +140,13 @@
     "package": "vsce package",
     "install-extension": "code --install-extension zapper-vscode-0.0.1.vsix"
   },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
   "devDependencies": {
     "@types/vscode": "^1.74.0",
     "@types/node": "16.x",
     "typescript": "^4.9.4",
-    "@vscode/vsce": "^2.19.0",
-    "zod": "^3.22.4"
+    "@vscode/vsce": "^2.19.0"
   }
 }
