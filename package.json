@@ -1,0 +1,43 @@
+{
+  "name": "zapper-vscode",
+  "displayName": "Zapper",
+  "description": "VS Code extension for managing local development with zapper CLI",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:zapperView"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "zapperView",
+          "name": "Zapper"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "zapper.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "typescript": "^4.9.4"
+  }
+}
