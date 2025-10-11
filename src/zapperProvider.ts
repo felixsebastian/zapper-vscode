@@ -98,7 +98,7 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
           });
         } else if (element.sectionType === 'tasks' && project.tasks) {
           project.tasks.forEach(task => {
-            items.push(new ZapperItem(task.name, vscode.TreeItemCollapsibleState.None, 'task', project.name, undefined, project.rootPath));
+            items.push(new ZapperItem(task.name as string, vscode.TreeItemCollapsibleState.None, 'task', project.name, undefined, project.rootPath));
           });
         }
         

@@ -30,6 +30,10 @@ export const TaskSchema = z.object({
   cwd: z.string().optional()
 });
 
+export const TaskNameSchema = z.object({
+  name: z.string()
+});
+
 export const ZapperConfigSchema = z.object({
   projectName: z.string(),
   projectRoot: z.string(),
@@ -44,12 +48,13 @@ export const ZapperStatusSchema = z.object({
   docker: z.array(ServiceStatusSchema)
 });
 
-export const ZapperTasksSchema = z.array(TaskSchema);
+export const ZapperTasksSchema = z.array(TaskNameSchema);
 
 export type ServiceStatus = z.infer<typeof ServiceStatusSchema>;
 export type Process = z.infer<typeof ProcessSchema>;
 export type Container = z.infer<typeof ContainerSchema>;
 export type Task = z.infer<typeof TaskSchema>;
+export type TaskName = z.infer<typeof TaskNameSchema>;
 export type ZapperConfig = z.infer<typeof ZapperConfigSchema>;
 export type ZapperStatus = z.infer<typeof ZapperStatusSchema>;
 export type ZapperTasks = z.infer<typeof ZapperTasksSchema>;
