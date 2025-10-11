@@ -2,7 +2,7 @@
   "name": "zapper-vscode",
   "displayName": "Zapper",
   "description": "VS Code extension for managing local development with zapper CLI",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "publisher": "felixsebastian",
   "license": "MIT",
   "repository": {
@@ -46,15 +46,18 @@
       },
       {
         "command": "zapper.start",
-        "title": "Start"
+        "title": "Start",
+        "icon": "$(play)"
       },
       {
         "command": "zapper.stop",
-        "title": "Stop"
+        "title": "Stop",
+        "icon": "$(primitive-square)"
       },
       {
         "command": "zapper.restart",
-        "title": "Restart"
+        "title": "Restart",
+        "icon": "$(refresh)"
       },
       {
         "command": "zapper.runTask",
@@ -77,7 +80,18 @@
       },
       {
         "command": "zapper.openLogs",
-        "title": "Logs"
+        "title": "Logs",
+        "icon": "$(output)"
+      },
+      {
+        "command": "zapper.openTerminal",
+        "title": "Terminal",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "zapper.openZapFile",
+        "title": "Open zap.yaml",
+        "icon": "$(gear)"
       }
     ],
     "menus": {
@@ -94,6 +108,11 @@
         },
         {
           "command": "zapper.restartAll",
+          "when": "view == zapperView",
+          "group": "navigation"
+        },
+        {
+          "command": "zapper.openZapFile",
           "when": "view == zapperView",
           "group": "navigation"
         }
@@ -117,6 +136,11 @@
         {
           "command": "zapper.openLogs",
           "when": "viewItem == service-running",
+          "group": "inline"
+        },
+        {
+          "command": "zapper.openTerminal",
+          "when": "viewItem == service-running || viewItem == service-stopped",
           "group": "inline"
         },
         {

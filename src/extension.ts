@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ZapperProvider } from './zapperProvider';
-import { startService, stopService, restartService, openLogsTerminal, openTaskTerminal, startAllServices, stopAllServices, restartAllServices } from './zapperService';
+import { startService, stopService, restartService, openLogsTerminal, openTaskTerminal, openServiceTerminal, startAllServices, stopAllServices, restartAllServices } from './zapperService';
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('Zapper extension is now active!');
@@ -96,6 +96,17 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
+  vscode.commands.registerCommand('zapper.openTerminal', async (item) => {
+    if (item && item.projectPath && item.label) {
+      try {
+        await openServiceTerminal(item.projectPath, item.label);
+        vscode.window.showInformationMessage(`Opening terminal for ${item.label}`);
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to open terminal for ${item.label}: ${error}`);
+      }
+    }
+  });
+
   vscode.commands.registerCommand('zapper.startAll', async () => {
     try {
       const { getAllZapperStatuses } = await import('./zapperService');
@@ -106,15 +117,13 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
       
-      // Start all services in all projects
-      const promises = projects.map(project => 
-        startAllServices(project.rootPath).catch(error => {
-          console.error(`Failed to start services in ${project.name}:`, error);
-          return error;
-        })
-      );
+      if (projects.length > 1) {
+        vscode.window.showWarningMessage('Global actions are only available for single-project workspaces');
+        return;
+      }
       
-      await Promise.all(promises);
+      // Single project - start all services
+      await startAllServices(projects[0].rootPath);
       vscode.window.showInformationMessage('Started all services');
       provider.refresh();
     } catch (error) {
@@ -132,15 +141,13 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
       
-      // Stop all services in all projects
-      const promises = projects.map(project => 
-        stopAllServices(project.rootPath).catch(error => {
-          console.error(`Failed to stop services in ${project.name}:`, error);
-          return error;
-        })
-      );
+      if (projects.length > 1) {
+        vscode.window.showWarningMessage('Global actions are only available for single-project workspaces');
+        return;
+      }
       
-      await Promise.all(promises);
+      // Single project - stop all services
+      await stopAllServices(projects[0].rootPath);
       vscode.window.showInformationMessage('Stopped all services');
       provider.refresh();
     } catch (error) {
@@ -158,19 +165,51 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
       
-      // Restart all services in all projects
-      const promises = projects.map(project => 
-        restartAllServices(project.rootPath).catch(error => {
-          console.error(`Failed to restart services in ${project.name}:`, error);
-          return error;
-        })
-      );
+      if (projects.length > 1) {
+        vscode.window.showWarningMessage('Global actions are only available for single-project workspaces');
+        return;
+      }
       
-      await Promise.all(promises);
+      // Single project - restart all services
+      await restartAllServices(projects[0].rootPath);
       vscode.window.showInformationMessage('Restarted all services');
       provider.refresh();
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to restart all services: ${error}`);
+    }
+  });
+
+  vscode.commands.registerCommand('zapper.openZapFile', async () => {
+    try {
+      const { getAllZapperStatuses } = await import('./zapperService');
+      const projects = await getAllZapperStatuses();
+      
+      if (projects.length === 0) {
+        vscode.window.showWarningMessage('No zapper projects found');
+        return;
+      }
+      
+      if (projects.length === 1) {
+        // Single project - open its zap.yaml file
+        const zapFilePath = vscode.Uri.file(`${projects[0].rootPath}/zap.yaml`);
+        await vscode.window.showTextDocument(zapFilePath);
+      } else {
+        // Multiple projects - let user choose which one
+        const projectNames = projects.map(p => p.name);
+        const selectedProject = await vscode.window.showQuickPick(projectNames, {
+          placeHolder: 'Select a project to open its zap.yaml file'
+        });
+        
+        if (selectedProject) {
+          const project = projects.find(p => p.name === selectedProject);
+          if (project) {
+            const zapFilePath = vscode.Uri.file(`${project.rootPath}/zap.yaml`);
+            await vscode.window.showTextDocument(zapFilePath);
+          }
+        }
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to open zap.yaml file: ${error}`);
     }
   });
 

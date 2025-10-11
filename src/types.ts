@@ -4,12 +4,39 @@ export const ServiceStatusSchema = z.object({
   service: z.string(),
   rawName: z.string(),
   status: z.string(),
-  type: z.enum(['bare_metal', 'docker'])
+  type: z.enum(['bare_metal', 'docker']),
+  cwd: z.string().optional()
+});
+
+export const ProcessSchema = z.object({
+  cmd: z.string(),
+  cwd: z.string().optional(),
+  aliases: z.array(z.string()).optional(),
+  repo: z.string().optional(),
+  name: z.string(),
+  profiles: z.array(z.string()).optional()
+});
+
+export const ContainerSchema = z.object({
+  image: z.string(),
+  ports: z.array(z.string()).optional(),
+  volumes: z.array(z.string()).optional(),
+  name: z.string()
 });
 
 export const TaskSchema = z.object({
   name: z.string(),
-  description: z.string().optional()
+  cmds: z.array(z.string()),
+  cwd: z.string().optional()
+});
+
+export const ZapperConfigSchema = z.object({
+  projectName: z.string(),
+  projectRoot: z.string(),
+  envFiles: z.array(z.string()),
+  processes: z.array(ProcessSchema),
+  containers: z.array(ContainerSchema),
+  tasks: z.array(TaskSchema)
 });
 
 export const ZapperStatusSchema = z.object({
@@ -20,7 +47,10 @@ export const ZapperStatusSchema = z.object({
 export const ZapperTasksSchema = z.array(TaskSchema);
 
 export type ServiceStatus = z.infer<typeof ServiceStatusSchema>;
+export type Process = z.infer<typeof ProcessSchema>;
+export type Container = z.infer<typeof ContainerSchema>;
 export type Task = z.infer<typeof TaskSchema>;
+export type ZapperConfig = z.infer<typeof ZapperConfigSchema>;
 export type ZapperStatus = z.infer<typeof ZapperStatusSchema>;
 export type ZapperTasks = z.infer<typeof ZapperTasksSchema>;
 

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { ZapperStatus, ZapperStatusSchema, ZapperTasks, ZapperTasksSchema } from './types';
+import { ZapperStatus, ZapperStatusSchema, ZapperTasks, ZapperTasksSchema, ZapperConfig, ZapperConfigSchema } from './types';
 
 export interface ZapperProject {
   rootPath: string;
@@ -102,6 +102,26 @@ export async function getZapperTasksForProject(project: ZapperProject): Promise<
     return validationResult.data;
   } catch (error) {
     console.error(`Failed to get zapper tasks for ${project.name}:`, error);
+    return null;
+  }
+}
+
+export async function getZapperConfigForProject(project: ZapperProject): Promise<ZapperConfig | null> {
+  try {
+    const output = await executeZapCommand('config --pretty', project.rootPath);
+    const rawData = JSON.parse(output);
+    
+    // Validate the data with Zod
+    const validationResult = ZapperConfigSchema.safeParse(rawData);
+    
+    if (!validationResult.success) {
+      console.error(`Invalid zapper config data for ${project.name}:`, validationResult.error);
+      return null;
+    }
+    
+    return validationResult.data;
+  } catch (error) {
+    console.error(`Failed to get zapper config for ${project.name}:`, error);
     return null;
   }
 }
@@ -208,5 +228,46 @@ export async function openLogsTerminal(projectPath: string, serviceName: string)
 export async function openTaskTerminal(projectPath: string, taskName: string): Promise<void> {
   const command = `zap task ${taskName}`;
   await openTerminalAndRunCommand(command, projectPath, `Task: ${taskName}`);
+}
+
+export async function openServiceTerminal(projectPath: string, serviceName: string): Promise<void> {
+  try {
+    // Get the project configuration to find the cwd
+    const project: ZapperProject = {
+      rootPath: projectPath,
+      name: 'temp', // We don't need the name for config fetching
+      status: null,
+      tasks: null
+    };
+    
+    const config = await getZapperConfigForProject(project);
+    if (!config) {
+      throw new Error('Failed to get zapper configuration');
+    }
+    
+    // Find the service in the processes array
+    const service = config.processes.find(p => p.name === serviceName);
+    let targetPath = projectPath;
+    
+    if (service && service.cwd) {
+      targetPath = `${projectPath}/${service.cwd}`;
+    } else {
+      // Fallback to service name if no cwd specified
+      targetPath = `${projectPath}/${serviceName}`;
+    }
+    
+    const terminalName = `Terminal: ${serviceName}`;
+    
+    const terminal = vscode.window.createTerminal({
+      name: terminalName,
+      cwd: targetPath,
+      location: vscode.TerminalLocation.Editor
+    });
+    
+    terminal.show();
+  } catch (error) {
+    console.error(`Failed to open terminal for service ${serviceName}:`, error);
+    throw error;
+  }
 }
 
