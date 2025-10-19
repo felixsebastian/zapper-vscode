@@ -21,6 +21,16 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Zapper",
+      "properties": {
+        "zapper.customCommand": {
+          "type": "string",
+          "default": "",
+          "description": "Custom zap command to use instead of 'zap'. Leave empty to use default 'zap' command."
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {

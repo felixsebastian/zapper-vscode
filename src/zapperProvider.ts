@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { getAllZapperStatuses, ZapperProject } from './zapperService';
+import { getAllZapperStatuses, ZapperProject, isUsingCustomCommand, getZapCommand } from './zapperService';
 import { ServiceStatus, Task } from './types';
 
 export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
@@ -22,9 +22,15 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
   }
 
   private async pollStatus(): Promise<void> {
+    console.log('ZapperProvider: Starting pollStatus');
     try {
       this.projects = await getAllZapperStatuses();
+      console.log(`ZapperProvider: Poll completed, got ${this.projects.length} projects`);
+      this.projects.forEach((project, index) => {
+        console.log(`ZapperProvider: Project ${index}: ${project.name}, status: ${project.status ? 'has status' : 'no status'}, tasks: ${project.tasks ? 'has tasks' : 'no tasks'}`);
+      });
       this._onDidChangeTreeData.fire();
+      console.log('ZapperProvider: Fired tree data change event');
     } catch (error) {
       console.error('Failed to poll zapper status:', error);
     }
@@ -49,6 +55,12 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
     
     if (!element) {
       const items: ZapperItem[] = [];
+      
+      // Add custom command indicator at the top if using custom command
+      if (isUsingCustomCommand()) {
+        const customCommand = getZapCommand();
+        items.push(new ZapperItem(`Using ${customCommand} command`, vscode.TreeItemCollapsibleState.None, 'info'));
+      }
       
       if (this.projects.length === 0) {
         console.log('No projects found, showing placeholder');
@@ -114,7 +126,7 @@ class ZapperItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-    public readonly type: 'project' | 'section' | 'service' | 'task' = 'service',
+    public readonly type: 'project' | 'section' | 'service' | 'task' | 'info' = 'service',
     public readonly projectName?: string,
     public readonly status?: string,
     public readonly projectPath?: string,
@@ -126,6 +138,9 @@ class ZapperItem extends vscode.TreeItem {
       this.contextValue = 'project';
     } else if (type === 'section') {
       this.contextValue = 'section';
+    } else if (type === 'info') {
+      this.contextValue = 'info';
+      this.iconPath = new vscode.ThemeIcon('info');
     } else if (type === 'service') {
       this.contextValue = 'service';
       console.log('Created service item with contextValue:', this.contextValue);
