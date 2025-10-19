@@ -175,7 +175,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "build": "npm run compile",
+    "build": "npm run compile && vsce package",
     "package": "vsce package",
     "install-extension": "code --install-extension zapper-vscode-0.0.1.vsix"
   },
