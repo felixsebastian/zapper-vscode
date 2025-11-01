@@ -9,10 +9,6 @@
     "url": "https://github.com/felixsebastian/zapper-vscode.git"
   },
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/felixsebastian/zapper-vscode.git"
-  },
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.74.0"
@@ -179,10 +175,10 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "build": "npm run compile && vsce package",
-    "package": "vsce package",
-    "buildpack": "npm run compile && vsce package",
-    "install-extension": "code --install-extension zapper-vscode-0.0.1.vsix"
+    "build": "npm run compile && vsce package --out builds/",
+    "package": "vsce package --out builds/",
+    "buildpack": "npm run compile && vsce package --out builds/",
+    "install-extension": "code --install-extension builds/zapper-vscode-0.3.0.vsix"
   },
   "dependencies": {
     "zod": "^3.22.4"
