@@ -175,9 +175,9 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "build": "npm run compile && vsce package --out builds/",
-    "package": "vsce package --out builds/",
-    "buildpack": "npm run compile && vsce package --out builds/",
+    "build": "npm run compile && mkdir -p builds && vsce package --out builds/",
+    "package": "mkdir -p builds && vsce package --out builds/",
+    "buildpack": "npm run compile && mkdir -p builds && vsce package --out builds/",
     "install-extension": "code --install-extension builds/zapper-vscode-0.3.0.vsix"
   },
   "dependencies": {
