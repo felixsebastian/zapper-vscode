@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ZapperStatus, ZapperStatusSchema, ZapperTasks, ZapperTasksSchema, ZapperConfig, ZapperConfigSchema } from './types';
+import { logger } from './logger';
 
 export interface ZapperProject {
   rootPath: string;
@@ -11,22 +12,22 @@ export interface ZapperProject {
 }
 
 export async function findZapperProjects(): Promise<ZapperProject[]> {
-  console.log('findZapperProjects: Starting to find projects');
+  logger.info('findZapperProjects: Starting to find projects');
   const projects: ZapperProject[] = [];
   
   // Get all workspace folders
   const workspaceFolders = vscode.workspace.workspaceFolders || [];
-  console.log(`findZapperProjects: Found ${workspaceFolders.length} workspace folders`);
+  logger.debug(`findZapperProjects: Found ${workspaceFolders.length} workspace folders`);
   
   // Check workspace folders first
   for (const folder of workspaceFolders) {
     const zapYamlPath = path.join(folder.uri.fsPath, 'zap.yaml');
-    console.log(`findZapperProjects: Checking ${zapYamlPath}`);
+    logger.debug(`findZapperProjects: Checking ${zapYamlPath}`);
     
     try {
       // Check if zap.yaml exists in this folder
       if (fs.existsSync(zapYamlPath)) {
-        console.log(`findZapperProjects: Found zap.yaml in ${folder.uri.fsPath}`);
+        logger.info(`findZapperProjects: Found zap.yaml in ${folder.uri.fsPath}`);
         projects.push({
           rootPath: folder.uri.fsPath,
           name: `${folder.name} (${folder.uri.fsPath})`,
@@ -34,23 +35,23 @@ export async function findZapperProjects(): Promise<ZapperProject[]> {
           tasks: null
         });
       } else {
-        console.log(`findZapperProjects: No zap.yaml found in ${folder.uri.fsPath}`);
+        logger.debug(`findZapperProjects: No zap.yaml found in ${folder.uri.fsPath}`);
       }
     } catch (error) {
-      console.error(`Error checking zap.yaml in ${folder.uri.fsPath}:`, error);
+      logger.error(`Error checking zap.yaml in ${folder.uri.fsPath}`, error);
     }
   }
   
   // If no projects found in workspace folders, check current working directory
   if (projects.length === 0) {
-    console.log('findZapperProjects: No projects in workspace folders, checking current directory');
+    logger.info('findZapperProjects: No projects in workspace folders, checking current directory');
     const currentDir = process.cwd();
     const zapYamlPath = path.join(currentDir, 'zap.yaml');
-    console.log(`findZapperProjects: Checking ${zapYamlPath}`);
+    logger.debug(`findZapperProjects: Checking ${zapYamlPath}`);
     
     try {
       if (fs.existsSync(zapYamlPath)) {
-        console.log(`findZapperProjects: Found zap.yaml in current directory ${currentDir}`);
+        logger.info(`findZapperProjects: Found zap.yaml in current directory ${currentDir}`);
         projects.push({
           rootPath: currentDir,
           name: `Current Directory (${currentDir})`,
@@ -58,57 +59,80 @@ export async function findZapperProjects(): Promise<ZapperProject[]> {
           tasks: null
         });
       } else {
-        console.log(`findZapperProjects: No zap.yaml found in current directory ${currentDir}`);
+        logger.debug(`findZapperProjects: No zap.yaml found in current directory ${currentDir}`);
       }
     } catch (error) {
-      console.error(`Error checking zap.yaml in current directory ${currentDir}:`, error);
+      logger.error(`Error checking zap.yaml in current directory ${currentDir}`, error);
     }
   }
   
-  console.log(`findZapperProjects: Returning ${projects.length} projects`);
+  logger.info(`findZapperProjects: Returning ${projects.length} projects`);
   return projects;
 }
 
 export async function executeZapCommand(command: string, workingDirectory: string): Promise<string> {
-  // Get custom command from settings
-  const customCommand = vscode.workspace.getConfiguration('zapper').get<string>('customCommand');
-  const zapCommand = customCommand && customCommand.trim() !== '' ? customCommand : 'zap';
+  const zapPath = vscode.workspace.getConfiguration('zapper').get<string>('zapPath');
+  const hasCustomPath = zapPath && zapPath.trim() !== '';
   
-  console.log(`executeZapCommand: Running '${zapCommand} ${command}' in ${workingDirectory}`);
+  logger.debug(`executeZapCommand: Running 'zap ${command}' in ${workingDirectory}${hasCustomPath ? ` (using path: ${zapPath})` : ''}`);
+  
   return new Promise((resolve, reject) => {
     const { spawn } = require('child_process');
-    const process = spawn(zapCommand, command.split(' '), { 
-      shell: true,
-      cwd: workingDirectory
-    });
+    const nodeProcess = require('process');
+    
+    let childProcess;
+    
+    if (hasCustomPath) {
+      // Use the provided path directly - split command into args
+      const args = command.split(' ').filter(arg => arg.length > 0);
+      childProcess = spawn(zapPath!.trim(), args, {
+        cwd: workingDirectory,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+    } else {
+      // Use shell with login flag to load profile (PATH, etc.)
+      const userShell: string = vscode.env.shell || (nodeProcess.platform === 'darwin' ? '/bin/zsh' : '/bin/bash');
+      const fullCommand = `zap ${command}`;
+      
+      // Use -l flag for login shell (loads profile) and -c to execute command
+      // For zsh: -l makes it a login shell which sources ~/.zprofile
+      // For bash: -l makes it a login shell which sources ~/.bash_profile
+      childProcess = spawn(userShell, ['-l', '-c', fullCommand], {
+        cwd: workingDirectory,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+    }
     
     let stdout = '';
     let stderr = '';
     
-    process.stdout.on('data', (data: Buffer) => {
+    childProcess.stdout.on('data', (data: Buffer) => {
       stdout += data.toString();
     });
     
-    process.stderr.on('data', (data: Buffer) => {
+    childProcess.stderr.on('data', (data: Buffer) => {
       stderr += data.toString();
     });
     
-    process.on('error', (error: Error) => {
-      console.error(`executeZapCommand: Process error: ${error.message}`);
+    childProcess.on('error', (error: Error) => {
+      logger.error(`executeZapCommand: Process error`, error);
       if (error.message.includes('ENOENT')) {
-        reject(new Error(`${zapCommand} command not found. Please ensure zapper CLI is installed and available in PATH.`));
+        const errorMsg = hasCustomPath
+          ? `Zap executable not found at path: ${zapPath}. Please check the path in settings.`
+          : `zap command not found. Please ensure zapper CLI is installed and available in PATH, or set the 'zapper.zapPath' setting.`;
+        reject(new Error(errorMsg));
       } else {
         reject(error);
       }
     });
     
-    process.on('close', (code: number) => {
-      console.log(`executeZapCommand: Command completed with code ${code}`);
+    childProcess.on('close', (code: number) => {
+      logger.debug(`executeZapCommand: Command completed with code ${code}`);
       if (code === 0) {
-        console.log(`executeZapCommand: Success, stdout length: ${stdout.length}`);
+        logger.debug(`executeZapCommand: Success, stdout length: ${stdout.length}`);
         resolve(stdout);
       } else {
-        console.error(`executeZapCommand: Failed with stderr: ${stderr}`);
+        logger.error(`executeZapCommand: Failed with stderr`, new Error(stderr));
         reject(new Error(`Command failed with code ${code}: ${stderr}`));
       }
     });
@@ -116,53 +140,53 @@ export async function executeZapCommand(command: string, workingDirectory: strin
 }
 
 export async function getZapperStatusForProject(project: ZapperProject): Promise<ZapperStatus | null> {
-  console.log(`getZapperStatusForProject: Getting status for ${project.name}`);
+  logger.info(`getZapperStatusForProject: Getting status for ${project.name}`);
   try {
     const output = await executeZapCommand('status --json', project.rootPath);
-    console.log(`getZapperStatusForProject: Raw output length: ${output.length}`);
-    console.log(`getZapperStatusForProject: Raw output preview: ${output.substring(0, 200)}...`);
+    logger.debug(`getZapperStatusForProject: Raw output length: ${output.length}`);
+    logger.debug(`getZapperStatusForProject: Raw output preview: ${output.substring(0, 200)}...`);
     
     const rawData = JSON.parse(output);
-    console.log(`getZapperStatusForProject: Parsed JSON data:`, rawData);
+    logger.debug(`getZapperStatusForProject: Parsed JSON data: ${JSON.stringify(rawData)}`);
     
     // Validate the data with Zod
     const validationResult = ZapperStatusSchema.safeParse(rawData);
     
     if (!validationResult.success) {
-      console.error(`Invalid zapper status data for ${project.name}:`, validationResult.error);
+      logger.error(`Invalid zapper status data for ${project.name}`, validationResult.error);
       return null;
     }
     
-    console.log(`getZapperStatusForProject: Validation successful for ${project.name}`);
+    logger.debug(`getZapperStatusForProject: Validation successful for ${project.name}`);
     return validationResult.data;
   } catch (error) {
-    console.error(`Failed to get zapper status for ${project.name}:`, error);
+    logger.error(`Failed to get zapper status for ${project.name}`, error);
     return null;
   }
 }
 
 export async function getZapperTasksForProject(project: ZapperProject): Promise<ZapperTasks | null> {
-  console.log(`getZapperTasksForProject: Getting tasks for ${project.name}`);
+  logger.info(`getZapperTasksForProject: Getting tasks for ${project.name}`);
   try {
     const output = await executeZapCommand('task --json', project.rootPath);
-    console.log(`getZapperTasksForProject: Raw output length: ${output.length}`);
-    console.log(`getZapperTasksForProject: Raw output preview: ${output.substring(0, 200)}...`);
+    logger.debug(`getZapperTasksForProject: Raw output length: ${output.length}`);
+    logger.debug(`getZapperTasksForProject: Raw output preview: ${output.substring(0, 200)}...`);
     
     const rawData = JSON.parse(output);
-    console.log(`getZapperTasksForProject: Parsed JSON data:`, rawData);
+    logger.debug(`getZapperTasksForProject: Parsed JSON data: ${JSON.stringify(rawData)}`);
     
     // Validate the data with Zod
     const validationResult = ZapperTasksSchema.safeParse(rawData);
     
     if (!validationResult.success) {
-      console.error(`Invalid zapper tasks data for ${project.name}:`, validationResult.error);
+      logger.error(`Invalid zapper tasks data for ${project.name}`, validationResult.error);
       return null;
     }
     
-    console.log(`getZapperTasksForProject: Validation successful for ${project.name}`);
+    logger.debug(`getZapperTasksForProject: Validation successful for ${project.name}`);
     return validationResult.data;
   } catch (error) {
-    console.error(`Failed to get zapper tasks for ${project.name}:`, error);
+    logger.error(`Failed to get zapper tasks for ${project.name}`, error);
     return null;
   }
 }
@@ -176,45 +200,45 @@ export async function getZapperConfigForProject(project: ZapperProject): Promise
     const validationResult = ZapperConfigSchema.safeParse(rawData);
     
     if (!validationResult.success) {
-      console.error(`Invalid zapper config data for ${project.name}:`, validationResult.error);
+      logger.error(`Invalid zapper config data for ${project.name}`, validationResult.error);
       return null;
     }
     
     return validationResult.data;
   } catch (error) {
-    console.error(`Failed to get zapper config for ${project.name}:`, error);
+    logger.error(`Failed to get zapper config for ${project.name}`, error);
     return null;
   }
 }
 
-export function isUsingCustomCommand(): boolean {
-  const customCommand = vscode.workspace.getConfiguration('zapper').get<string>('customCommand');
-  return Boolean(customCommand && customCommand.trim() !== '');
+export function isUsingCustomPath(): boolean {
+  const zapPath = vscode.workspace.getConfiguration('zapper').get<string>('zapPath');
+  return Boolean(zapPath && zapPath.trim() !== '');
 }
 
-export function getZapCommand(): string {
-  const customCommand = vscode.workspace.getConfiguration('zapper').get<string>('customCommand');
-  return customCommand && customCommand.trim() !== '' ? customCommand : 'zap';
+export function getZapPath(): string {
+  const zapPath = vscode.workspace.getConfiguration('zapper').get<string>('zapPath');
+  return zapPath && zapPath.trim() !== '' ? zapPath.trim() : 'zap';
 }
 
 export async function getAllZapperStatuses(): Promise<ZapperProject[]> {
-  console.log('getAllZapperStatuses: Starting to get all zapper statuses');
+  logger.info('getAllZapperStatuses: Starting to get all zapper statuses');
   const projects = await findZapperProjects();
-  console.log(`getAllZapperStatuses: Found ${projects.length} projects`);
+  logger.debug(`getAllZapperStatuses: Found ${projects.length} projects`);
   
   // Get status and tasks for each project in parallel
   const statusPromises = projects.map(async (project) => {
-    console.log(`getAllZapperStatuses: Processing project ${project.name}`);
+    logger.debug(`getAllZapperStatuses: Processing project ${project.name}`);
     const [status, tasks] = await Promise.all([
       getZapperStatusForProject(project),
       getZapperTasksForProject(project)
     ]);
-    console.log(`getAllZapperStatuses: Project ${project.name} - status: ${status ? 'found' : 'null'}, tasks: ${tasks ? 'found' : 'null'}`);
+    logger.debug(`getAllZapperStatuses: Project ${project.name} - status: ${status ? 'found' : 'null'}, tasks: ${tasks ? 'found' : 'null'}`);
     return { ...project, status, tasks };
   });
   
   const result = await Promise.all(statusPromises);
-  console.log(`getAllZapperStatuses: Returning ${result.length} projects with data`);
+  logger.info(`getAllZapperStatuses: Returning ${result.length} projects with data`);
   return result;
 }
 
@@ -222,7 +246,7 @@ export async function startService(projectPath: string, serviceName: string): Pr
   try {
     await executeZapCommand(`up ${serviceName}`, projectPath);
   } catch (error) {
-    console.error(`Failed to start service ${serviceName}:`, error);
+    logger.error(`Failed to start service ${serviceName}`, error);
     throw error;
   }
 }
@@ -231,7 +255,7 @@ export async function stopService(projectPath: string, serviceName: string): Pro
   try {
     await executeZapCommand(`down ${serviceName}`, projectPath);
   } catch (error) {
-    console.error(`Failed to stop service ${serviceName}:`, error);
+    logger.error(`Failed to stop service ${serviceName}`, error);
     throw error;
   }
 }
@@ -240,7 +264,7 @@ export async function restartService(projectPath: string, serviceName: string): 
   try {
     await executeZapCommand(`restart ${serviceName}`, projectPath);
   } catch (error) {
-    console.error(`Failed to restart service ${serviceName}:`, error);
+    logger.error(`Failed to restart service ${serviceName}`, error);
     throw error;
   }
 }
@@ -249,7 +273,7 @@ export async function runTask(projectPath: string, taskName: string): Promise<vo
   try {
     await executeZapCommand(`task ${taskName}`, projectPath);
   } catch (error) {
-    console.error(`Failed to run task ${taskName}:`, error);
+    logger.error(`Failed to run task ${taskName}`, error);
     throw error;
   }
 }
@@ -258,7 +282,7 @@ export async function startAllServices(projectPath: string): Promise<void> {
   try {
     await executeZapCommand('up', projectPath);
   } catch (error) {
-    console.error('Failed to start all services:', error);
+    logger.error('Failed to start all services', error);
     throw error;
   }
 }
@@ -267,7 +291,7 @@ export async function stopAllServices(projectPath: string): Promise<void> {
   try {
     await executeZapCommand('down', projectPath);
   } catch (error) {
-    console.error('Failed to stop all services:', error);
+    logger.error('Failed to stop all services', error);
     throw error;
   }
 }
@@ -276,7 +300,7 @@ export async function restartAllServices(projectPath: string): Promise<void> {
   try {
     await executeZapCommand('restart', projectPath);
   } catch (error) {
-    console.error('Failed to restart all services:', error);
+    logger.error('Failed to restart all services', error);
     throw error;
   }
 }
@@ -292,18 +316,20 @@ export async function openTerminalAndRunCommand(command: string, projectPath: st
     terminal.show();
     terminal.sendText(command);
   } catch (error) {
-    console.error(`Failed to open terminal and run command:`, error);
+    logger.error(`Failed to open terminal and run command`, error);
     throw error;
   }
 }
 
 export async function openLogsTerminal(projectPath: string, serviceName: string): Promise<void> {
-  const command = `zap logs ${serviceName}`;
+  const zapCommand = getZapPath();
+  const command = `${zapCommand} logs ${serviceName}`;
   await openTerminalAndRunCommand(command, projectPath, `Logs: ${serviceName}`);
 }
 
 export async function openTaskTerminal(projectPath: string, taskName: string): Promise<void> {
-  const command = `zap task ${taskName}`;
+  const zapCommand = getZapPath();
+  const command = `${zapCommand} task ${taskName}`;
   await openTerminalAndRunCommand(command, projectPath, `Task: ${taskName}`);
 }
 
@@ -343,7 +369,7 @@ export async function openServiceTerminal(projectPath: string, serviceName: stri
     
     terminal.show();
   } catch (error) {
-    console.error(`Failed to open terminal for service ${serviceName}:`, error);
+    logger.error(`Failed to open terminal for service ${serviceName}`, error);
     throw error;
   }
 }

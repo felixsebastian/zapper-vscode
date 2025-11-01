@@ -1,22 +1,23 @@
 import * as vscode from 'vscode';
 import { ZapperProvider } from './zapperProvider';
 import { startService, stopService, restartService, openLogsTerminal, openTaskTerminal, openServiceTerminal, startAllServices, stopAllServices, restartAllServices } from './zapperService';
+import { logger } from './logger';
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Zapper extension is now active!');
+  logger.info('Zapper extension is now active!');
   
   const provider = new ZapperProvider(context.extensionUri);
   
   vscode.window.registerTreeDataProvider('zapperView', provider);
-  console.log('Tree data provider registered for zapperView');
+  logger.info('Tree data provider registered for zapperView');
   
   vscode.commands.registerCommand('zapper.refresh', () => {
-    console.log('Refresh command triggered');
+    logger.info('Refresh command triggered');
     provider.refresh();
   });
 
   vscode.commands.registerCommand('zapper.toggleService', async (item) => {
-    console.log('Toggle command triggered with item:', item);
+    logger.info(`Toggle command triggered with item: ${JSON.stringify(item)}`);
     if (item && item.projectPath && item.label && item.status) {
       try {
         if (item.status === 'up') {
@@ -28,6 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
         provider.refresh();
       } catch (error) {
+        logger.error(`Failed to toggle ${item.label}`, error);
         vscode.window.showErrorMessage(`Failed to toggle ${item.label}: ${error}`);
       }
     } else {
@@ -36,13 +38,14 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   vscode.commands.registerCommand('zapper.start', async (item) => {
-    console.log('Start command triggered with item:', item);
+    logger.info(`Start command triggered with item: ${JSON.stringify(item)}`);
     if (item && item.projectPath && item.label) {
       try {
         await startService(item.projectPath, item.label);
         vscode.window.showInformationMessage(`Started ${item.label}`);
         provider.refresh();
       } catch (error) {
+        logger.error(`Failed to start ${item.label}`, error);
         vscode.window.showErrorMessage(`Failed to start ${item.label}: ${error}`);
       }
     } else {
@@ -51,63 +54,74 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   vscode.commands.registerCommand('zapper.stop', async (item) => {
+    logger.info(`Stop command triggered with item: ${JSON.stringify(item)}`);
     if (item && item.projectPath && item.label) {
       try {
         await stopService(item.projectPath, item.label);
         vscode.window.showInformationMessage(`Stopped ${item.label}`);
         provider.refresh();
       } catch (error) {
+        logger.error(`Failed to stop ${item.label}`, error);
         vscode.window.showErrorMessage(`Failed to stop ${item.label}: ${error}`);
       }
     }
   });
 
   vscode.commands.registerCommand('zapper.restart', async (item) => {
+    logger.info(`Restart command triggered with item: ${JSON.stringify(item)}`);
     if (item && item.projectPath && item.label) {
       try {
         await restartService(item.projectPath, item.label);
         vscode.window.showInformationMessage(`Restarted ${item.label}`);
         provider.refresh();
       } catch (error) {
+        logger.error(`Failed to restart ${item.label}`, error);
         vscode.window.showErrorMessage(`Failed to restart ${item.label}: ${error}`);
       }
     }
   });
 
   vscode.commands.registerCommand('zapper.runTask', async (item) => {
+    logger.info(`Run task command triggered with item: ${JSON.stringify(item)}`);
     if (item && item.projectPath && item.label) {
       try {
         await openTaskTerminal(item.projectPath, item.label);
         vscode.window.showInformationMessage(`Running task ${item.label}`);
       } catch (error) {
+        logger.error(`Failed to run task ${item.label}`, error);
         vscode.window.showErrorMessage(`Failed to run task ${item.label}: ${error}`);
       }
     }
   });
 
   vscode.commands.registerCommand('zapper.openLogs', async (item) => {
+    logger.info(`Open logs command triggered with item: ${JSON.stringify(item)}`);
     if (item && item.projectPath && item.label) {
       try {
         await openLogsTerminal(item.projectPath, item.label);
         vscode.window.showInformationMessage(`Opening logs for ${item.label}`);
       } catch (error) {
+        logger.error(`Failed to open logs for ${item.label}`, error);
         vscode.window.showErrorMessage(`Failed to open logs for ${item.label}: ${error}`);
       }
     }
   });
 
   vscode.commands.registerCommand('zapper.openTerminal', async (item) => {
+    logger.info(`Open terminal command triggered with item: ${JSON.stringify(item)}`);
     if (item && item.projectPath && item.label) {
       try {
         await openServiceTerminal(item.projectPath, item.label);
         vscode.window.showInformationMessage(`Opening terminal for ${item.label}`);
       } catch (error) {
+        logger.error(`Failed to open terminal for ${item.label}`, error);
         vscode.window.showErrorMessage(`Failed to open terminal for ${item.label}: ${error}`);
       }
     }
   });
 
   vscode.commands.registerCommand('zapper.startAll', async () => {
+    logger.info('Start all command triggered');
     try {
       const { getAllZapperStatuses } = await import('./zapperService');
       const projects = await getAllZapperStatuses();
@@ -127,11 +141,13 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage('Started all services');
       provider.refresh();
     } catch (error) {
+      logger.error('Failed to start all services', error);
       vscode.window.showErrorMessage(`Failed to start all services: ${error}`);
     }
   });
 
   vscode.commands.registerCommand('zapper.stopAll', async () => {
+    logger.info('Stop all command triggered');
     try {
       const { getAllZapperStatuses } = await import('./zapperService');
       const projects = await getAllZapperStatuses();
@@ -151,11 +167,13 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage('Stopped all services');
       provider.refresh();
     } catch (error) {
+      logger.error('Failed to stop all services', error);
       vscode.window.showErrorMessage(`Failed to stop all services: ${error}`);
     }
   });
 
   vscode.commands.registerCommand('zapper.restartAll', async () => {
+    logger.info('Restart all command triggered');
     try {
       const { getAllZapperStatuses } = await import('./zapperService');
       const projects = await getAllZapperStatuses();
@@ -175,11 +193,13 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage('Restarted all services');
       provider.refresh();
     } catch (error) {
+      logger.error('Failed to restart all services', error);
       vscode.window.showErrorMessage(`Failed to restart all services: ${error}`);
     }
   });
 
   vscode.commands.registerCommand('zapper.openZapFile', async () => {
+    logger.info('Open zap file command triggered');
     try {
       const { getAllZapperStatuses } = await import('./zapperService');
       const projects = await getAllZapperStatuses();
@@ -209,8 +229,13 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
     } catch (error) {
+      logger.error('Failed to open zap.yaml file', error);
       vscode.window.showErrorMessage(`Failed to open zap.yaml file: ${error}`);
     }
+  });
+
+  vscode.commands.registerCommand('zapper.showLogs', () => {
+    logger.show();
   });
 
   // Clean up polling when extension deactivates

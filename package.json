@@ -17,17 +17,22 @@
     "Other"
   ],
   "activationEvents": [
-    "onView:zapper"
+    "onView:zapperView"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
       "title": "Zapper",
       "properties": {
-        "zapper.customCommand": {
+        "zapper.zapPath": {
           "type": "string",
           "default": "",
-          "description": "Custom zap command to use instead of 'zap'. Leave empty to use default 'zap' command."
+          "description": "Full path to the zap executable. Leave empty to use 'zap' command from PATH."
+        },
+        "zapper.debugMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show debug information in the Zapper panel (zap path, projects found, etc.)"
         }
       }
     },
@@ -102,6 +107,11 @@
         "command": "zapper.openZapFile",
         "title": "Open zap.yaml",
         "icon": "$(gear)"
+      },
+      {
+        "command": "zapper.showLogs",
+        "title": "Show Output Logs",
+        "icon": "$(output)"
       }
     ],
     "menus": {
@@ -123,6 +133,11 @@
         },
         {
           "command": "zapper.openZapFile",
+          "when": "view == zapperView",
+          "group": "navigation"
+        },
+        {
+          "command": "zapper.showLogs",
           "when": "view == zapperView",
           "group": "navigation"
         }
