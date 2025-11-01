@@ -19,3 +19,7 @@ So the extension will be a sidebar item with 3 sections:
 - bare metal processes (current status with start/stop button)
 - containers (current status with start/stop button)
 - tasks (run button)
+
+## Building
+
+To build just run `pnpm run buildpack`.

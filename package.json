@@ -27,7 +27,12 @@
         "zapper.zapPath": {
           "type": "string",
           "default": "",
-          "description": "Full path to the zap executable. Leave empty to use 'zap' command from PATH."
+          "description": "Full path to the zap executable. Leave empty to auto-detect from PATH or common install locations (falls back to 'zap' command)."
+        },
+        "zapper.nodePath": {
+          "type": "string",
+          "default": "",
+          "description": "Full path to the node executable. Leave empty to auto-detect from PATH or common install locations (falls back to VS Code's Node.js runtime)."
         },
         "zapper.debugMode": {
           "type": "boolean",

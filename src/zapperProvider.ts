@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { getAllZapperStatuses, ZapperProject, isUsingCustomPath, getZapPath } from './zapperService';
+import { getAllZapperStatuses, ZapperProject, isUsingCustomPath, getZapPathSync, getNodePathSync, isUsingCustomNodePath } from './zapperService';
 import { ServiceStatus, Task } from './types';
 import { logger } from './logger';
 
@@ -60,13 +60,13 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
       const debugMode = vscode.workspace.getConfiguration('zapper').get<boolean>('debugMode', false);
       
       if (debugMode) {
-        const zapPath = getZapPath();
+        const zapPath = getZapPathSync();
         items.push(new ZapperItem('Debug Info', vscode.TreeItemCollapsibleState.Expanded, 'debug'));
       }
       
       // Add custom path indicator at the top if using custom path (only if not in debug mode)
       if (!debugMode && isUsingCustomPath()) {
-        const zapPath = getZapPath();
+        const zapPath = getZapPathSync();
         items.push(new ZapperItem(`Using: ${zapPath}`, vscode.TreeItemCollapsibleState.None, 'info'));
       }
       
@@ -94,11 +94,15 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
       return Promise.resolve(items);
     } else if (element.type === 'debug') {
       const items: ZapperItem[] = [];
-      const zapPath = getZapPath();
+      const zapPath = getZapPathSync();
       const usingCustomPath = isUsingCustomPath();
+      const nodePath = getNodePathSync();
+      const usingCustomNodePath = isUsingCustomNodePath();
       
       items.push(new ZapperItem(`Zap Command: ${zapPath}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
-      items.push(new ZapperItem(`Using Custom Path: ${usingCustomPath ? 'Yes' : 'No'}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
+      items.push(new ZapperItem(`Using Custom Zap Path: ${usingCustomPath ? 'Yes' : 'No'}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
+      items.push(new ZapperItem(`Node Path: ${nodePath}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
+      items.push(new ZapperItem(`Using Custom Node Path: ${usingCustomNodePath ? 'Yes' : 'No'}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
       items.push(new ZapperItem(`Projects Found: ${this.projects.length}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
       
       if (this.projects.length > 0) {

@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { execSync } from 'child_process';
+import * as os from 'os';
 import { ZapperStatus, ZapperStatusSchema, ZapperTasks, ZapperTasksSchema, ZapperConfig, ZapperConfigSchema } from './types';
 import { logger } from './logger';
 
@@ -10,6 +12,12 @@ export interface ZapperProject {
   status: ZapperStatus | null;
   tasks: ZapperTasks | null;
 }
+
+let cachedZapPath: string | null = null;
+let zapPathLookupAttempted = false;
+
+let cachedNodePath: string | null = null;
+let nodePathLookupAttempted = false;
 
 export async function findZapperProjects(): Promise<ZapperProject[]> {
   logger.info('findZapperProjects: Starting to find projects');
@@ -70,35 +78,222 @@ export async function findZapperProjects(): Promise<ZapperProject[]> {
   return projects;
 }
 
-export async function executeZapCommand(command: string, workingDirectory: string): Promise<string> {
-  const zapPath = vscode.workspace.getConfiguration('zapper').get<string>('zapPath');
-  const hasCustomPath = zapPath && zapPath.trim() !== '';
+async function locateZapBinary(): Promise<string | null> {
+  if (cachedZapPath !== null) {
+    return cachedZapPath;
+  }
   
-  logger.debug(`executeZapCommand: Running 'zap ${command}' in ${workingDirectory}${hasCustomPath ? ` (using path: ${zapPath})` : ''}`);
+  if (zapPathLookupAttempted) {
+    return null;
+  }
+  
+  zapPathLookupAttempted = true;
+  
+  try {
+    const isWindows = os.platform() === 'win32';
+    const whichCommand = isWindows ? 'where' : 'which';
+    
+    try {
+      const result = execSync(`${whichCommand} zap`, { encoding: 'utf-8', timeout: 5000 }).trim();
+      if (result && fs.existsSync(result)) {
+        logger.info(`locateZapBinary: Found zap at ${result} via ${whichCommand}`);
+        cachedZapPath = result;
+        return result;
+      }
+    } catch (error) {
+      logger.debug(`locateZapBinary: ${whichCommand} zap failed, trying alternative locations`);
+    }
+    
+    const homeDir = os.homedir();
+    const commonPaths = [
+      path.join(homeDir, '.local', 'bin', 'zap'),
+      path.join(homeDir, '.npm-global', 'bin', 'zap'),
+      '/usr/local/bin/zap',
+      '/opt/homebrew/bin/zap',
+      path.join(path.dirname(process.execPath), 'zap'),
+    ];
+    
+    if (isWindows) {
+      commonPaths.push(
+        path.join(process.env.LOCALAPPDATA || '', 'npm', 'zap.cmd'),
+        path.join(process.env.APPDATA || '', 'npm', 'zap.cmd'),
+        path.join(process.env.ProgramFiles || '', 'nodejs', 'zap.cmd'),
+      );
+    }
+    
+    for (const testPath of commonPaths) {
+      if (fs.existsSync(testPath)) {
+        logger.info(`locateZapBinary: Found zap at ${testPath}`);
+        cachedZapPath = testPath;
+        return testPath;
+      }
+    }
+    
+    if (homeDir) {
+      const nvmVersionsPath = path.join(homeDir, '.nvm', 'versions', 'node');
+      if (fs.existsSync(nvmVersionsPath)) {
+        try {
+          const versions = fs.readdirSync(nvmVersionsPath).filter(v => {
+            const versionPath = path.join(nvmVersionsPath, v);
+            return fs.statSync(versionPath).isDirectory();
+          });
+          
+          for (const version of versions) {
+            const zapPath = path.join(nvmVersionsPath, version, 'bin', 'zap');
+            if (fs.existsSync(zapPath)) {
+              logger.info(`locateZapBinary: Found zap at ${zapPath} (via nvm)`);
+              cachedZapPath = zapPath;
+              return zapPath;
+            }
+          }
+        } catch (error) {
+          logger.debug(`locateZapBinary: Error checking nvm directory: ${error}`);
+        }
+      }
+    }
+    
+    logger.warn('locateZapBinary: Could not locate zap binary via auto-detection');
+    return null;
+  } catch (error) {
+    logger.error('locateZapBinary: Error during lookup', error);
+    return null;
+  }
+}
+
+async function getZapBinaryPath(): Promise<string> {
+  const resolvedPath = await locateZapBinary();
+  
+  if (resolvedPath) {
+    return resolvedPath;
+  }
+  
+  const userProvidedPath = vscode.workspace.getConfiguration('zapper').get<string>('zapPath');
+  if (userProvidedPath && userProvidedPath.trim() !== '') {
+    const resolvedUserPath = path.resolve(userProvidedPath.trim());
+    if (fs.existsSync(resolvedUserPath)) {
+      logger.debug(`getZapBinaryPath: Using user-provided path: ${resolvedUserPath}`);
+      return resolvedUserPath;
+    }
+    logger.warn(`getZapBinaryPath: User-provided path does not exist: ${resolvedUserPath}`);
+  }
+  
+  return 'zap';
+}
+
+export async function executeZapCommand(command: string, workingDirectory: string): Promise<string> {
+  let zapPath = await getZapBinaryPath();
+  let isExplicitPath = zapPath !== 'zap' && path.isAbsolute(zapPath);
+  
+  // If we're using 'zap' (not explicit path), try to locate it first
+  if (!isExplicitPath) {
+    const locatedPath = await locateZapBinary();
+    if (locatedPath) {
+      zapPath = locatedPath;
+      isExplicitPath = true;
+      logger.debug(`executeZapCommand: Located zap at ${zapPath}, using explicit path`);
+    }
+  }
+  
+  logger.debug(`executeZapCommand: Running 'zap ${command}' in ${workingDirectory}${isExplicitPath ? ` (using path: ${zapPath})` : ' (using PATH)'}`);
+  
+  // Debug: Check if zap file exists and read its shebang
+  if (isExplicitPath && fs.existsSync(zapPath)) {
+    try {
+      const firstLine = fs.readFileSync(zapPath, 'utf-8').split('\n')[0];
+      logger.debug(`executeZapCommand: Zap file shebang: ${firstLine}`);
+    } catch (error) {
+      logger.debug(`executeZapCommand: Could not read zap file: ${error}`);
+    }
+  }
+  
+  // Get detected node executable path (or fallback to VS Code's node runtime)
+  const nodeExecPath = await getNodeBinaryPath();
+  const nodeDir = path.dirname(nodeExecPath);
+  const nodeExe = path.basename(nodeExecPath);
   
   return new Promise((resolve, reject) => {
     const { spawn } = require('child_process');
     const nodeProcess = require('process');
     
+    // Build environment with node in PATH
+    const env = { ...nodeProcess.env };
+    
+    // Debug: Log current PATH and node info
+    logger.debug(`executeZapCommand: Node execPath: ${nodeExecPath}`);
+    logger.debug(`executeZapCommand: Node dir: ${nodeDir}`);
+    logger.debug(`executeZapCommand: Node exe: ${nodeExe}`);
+    logger.debug(`executeZapCommand: Original PATH: ${env.PATH || '(not set)'}`);
+    
+    // Ensure node directory is at the beginning of PATH
+    if (env.PATH) {
+      const pathParts = env.PATH.split(path.delimiter || ':');
+      if (!pathParts.includes(nodeDir)) {
+        env.PATH = `${nodeDir}${path.delimiter || ':'}${env.PATH}`;
+      }
+    } else {
+      env.PATH = nodeDir;
+    }
+    
+    logger.debug(`executeZapCommand: Updated PATH: ${env.PATH}`);
+    
+    // Verify node is accessible
+    try {
+      if (!fs.existsSync(nodeExecPath)) {
+        logger.error(`executeZapCommand: Node executable does not exist at ${nodeExecPath}`);
+      } else {
+        logger.debug(`executeZapCommand: Verified node exists at ${nodeExecPath}`);
+      }
+    } catch (error) {
+      logger.error(`executeZapCommand: Error checking node executable`, error);
+    }
+    
     let childProcess;
     
-    if (hasCustomPath) {
-      // Use the provided path directly - split command into args
-      const args = command.split(' ').filter(arg => arg.length > 0);
-      childProcess = spawn(zapPath!.trim(), args, {
-        cwd: workingDirectory,
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
-    } else {
-      // Use shell with login flag to load profile (PATH, etc.)
-      const userShell: string = vscode.env.shell || (nodeProcess.platform === 'darwin' ? '/bin/zsh' : '/bin/bash');
-      const fullCommand = `zap ${command}`;
+    if (isExplicitPath) {
+      // Check if zap is a node script that we should execute with node directly
+      let useNodeDirectly = false;
+      if (fs.existsSync(zapPath)) {
+        try {
+          const content = fs.readFileSync(zapPath, 'utf-8');
+          const firstLine = content.split('\n')[0];
+          if (firstLine.includes('node') || zapPath.endsWith('.js')) {
+            useNodeDirectly = true;
+            logger.debug(`executeZapCommand: Zap appears to be a Node.js script, executing with node directly`);
+          }
+        } catch (error) {
+          logger.debug(`executeZapCommand: Could not check zap file content: ${error}`);
+        }
+      }
       
-      // Use -l flag for login shell (loads profile) and -c to execute command
-      // For zsh: -l makes it a login shell which sources ~/.zprofile
-      // For bash: -l makes it a login shell which sources ~/.bash_profile
+      if (useNodeDirectly) {
+        // Execute zap script directly with node
+        const args = command.split(' ').filter(arg => arg.length > 0);
+        childProcess = spawn(nodeExecPath, [zapPath, ...args], {
+          cwd: workingDirectory,
+          env: env,
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+      } else {
+        // Execute zap directly
+        const args = command.split(' ').filter(arg => arg.length > 0);
+        childProcess = spawn(zapPath, args, {
+          cwd: workingDirectory,
+          env: env,
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+      }
+    } else {
+      // Use shell with PATH explicitly set in the command
+      const userShell: string = vscode.env.shell || (nodeProcess.platform === 'darwin' ? '/bin/zsh' : '/bin/bash');
+      // Export PATH at the beginning of the command to ensure node is available
+      const pathExport = `export PATH="${env.PATH}" && `;
+      const fullCommand = `${pathExport}${zapPath} ${command}`;
+      
+      logger.debug(`executeZapCommand: Shell command: ${fullCommand}`);
+      
       childProcess = spawn(userShell, ['-l', '-c', fullCommand], {
         cwd: workingDirectory,
+        env: env,
         stdio: ['ignore', 'pipe', 'pipe']
       });
     }
@@ -114,10 +309,23 @@ export async function executeZapCommand(command: string, workingDirectory: strin
       stderr += data.toString();
     });
     
-    childProcess.on('error', (error: Error) => {
+    childProcess.on('error', async (error: Error) => {
       logger.error(`executeZapCommand: Process error`, error);
       if (error.message.includes('ENOENT')) {
-        const errorMsg = hasCustomPath
+        const resolvedPath = await locateZapBinary();
+        if (!resolvedPath) {
+          const action = await vscode.window.showWarningMessage(
+            "Couldn't find 'zap' in your PATH. Do you want to specify its location?",
+            'Open Settings',
+            'Dismiss'
+          );
+          
+          if (action === 'Open Settings') {
+            await vscode.commands.executeCommand('workbench.action.openSettings', 'zapper.zapPath');
+          }
+        }
+        
+        const errorMsg = isExplicitPath
           ? `Zap executable not found at path: ${zapPath}. Please check the path in settings.`
           : `zap command not found. Please ensure zapper CLI is installed and available in PATH, or set the 'zapper.zapPath' setting.`;
         reject(new Error(errorMsg));
@@ -128,12 +336,20 @@ export async function executeZapCommand(command: string, workingDirectory: strin
     
     childProcess.on('close', (code: number) => {
       logger.debug(`executeZapCommand: Command completed with code ${code}`);
+      logger.debug(`executeZapCommand: stdout length: ${stdout.length}, stderr length: ${stderr.length}`);
       if (code === 0) {
         logger.debug(`executeZapCommand: Success, stdout length: ${stdout.length}`);
         resolve(stdout);
       } else {
-        logger.error(`executeZapCommand: Failed with stderr`, new Error(stderr));
-        reject(new Error(`Command failed with code ${code}: ${stderr}`));
+        logger.error(`executeZapCommand: Failed with code ${code}`);
+        logger.error(`executeZapCommand: stderr: ${stderr}`);
+        logger.error(`executeZapCommand: stdout: ${stdout}`);
+        if (stderr.includes('node: No such file or directory') || stderr.includes('env: node')) {
+          logger.error(`executeZapCommand: Node not found in PATH. Node dir: ${nodeDir}, PATH: ${env.PATH}`);
+          reject(new Error(`Node.js not found when executing zap. Node executable: ${nodeExecPath}, PATH: ${env.PATH}. Error: ${stderr}`));
+        } else {
+          reject(new Error(`Command failed with code ${code}: ${stderr || stdout}`));
+        }
       }
     });
   });
@@ -216,9 +432,156 @@ export function isUsingCustomPath(): boolean {
   return Boolean(zapPath && zapPath.trim() !== '');
 }
 
-export function getZapPath(): string {
-  const zapPath = vscode.workspace.getConfiguration('zapper').get<string>('zapPath');
-  return zapPath && zapPath.trim() !== '' ? zapPath.trim() : 'zap';
+export async function getZapPath(): Promise<string> {
+  return await getZapBinaryPath();
+}
+
+export function getZapPathSync(): string {
+  if (cachedZapPath) {
+    return cachedZapPath;
+  }
+  
+  const userProvidedPath = vscode.workspace.getConfiguration('zapper').get<string>('zapPath');
+  if (userProvidedPath && userProvidedPath.trim() !== '') {
+    return userProvidedPath.trim();
+  }
+  
+  return 'zap';
+}
+
+async function locateNodeBinary(): Promise<string | null> {
+  if (cachedNodePath !== null) {
+    return cachedNodePath;
+  }
+  
+  if (nodePathLookupAttempted) {
+    return null;
+  }
+  
+  nodePathLookupAttempted = true;
+  
+  try {
+    const isWindows = os.platform() === 'win32';
+    const whichCommand = isWindows ? 'where' : 'which';
+    
+    try {
+      const result = execSync(`${whichCommand} node`, { encoding: 'utf-8', timeout: 5000 }).trim();
+      if (result && fs.existsSync(result)) {
+        logger.info(`locateNodeBinary: Found node at ${result} via ${whichCommand}`);
+        cachedNodePath = result;
+        return result;
+      }
+    } catch (error) {
+      logger.debug(`locateNodeBinary: ${whichCommand} node failed, trying alternative locations`);
+    }
+    
+    const homeDir = os.homedir();
+    const commonPaths = [
+      path.join(homeDir, '.local', 'bin', 'node'),
+      path.join(homeDir, '.npm-global', 'bin', 'node'),
+      '/usr/local/bin/node',
+      '/opt/homebrew/bin/node',
+    ];
+    
+    if (isWindows) {
+      commonPaths.push(
+        path.join(process.env.LOCALAPPDATA || '', 'npm', 'node.exe'),
+        path.join(process.env.APPDATA || '', 'npm', 'node.exe'),
+        path.join(process.env.ProgramFiles || '', 'nodejs', 'node.exe'),
+      );
+    }
+    
+    for (const testPath of commonPaths) {
+      if (fs.existsSync(testPath)) {
+        logger.info(`locateNodeBinary: Found node at ${testPath}`);
+        cachedNodePath = testPath;
+        return testPath;
+      }
+    }
+    
+    if (homeDir) {
+      const nvmVersionsPath = path.join(homeDir, '.nvm', 'versions', 'node');
+      if (fs.existsSync(nvmVersionsPath)) {
+        try {
+          const versions = fs.readdirSync(nvmVersionsPath).filter(v => {
+            const versionPath = path.join(nvmVersionsPath, v);
+            return fs.statSync(versionPath).isDirectory();
+          });
+          
+          for (const version of versions) {
+            const nodePath = path.join(nvmVersionsPath, version, 'bin', 'node');
+            if (fs.existsSync(nodePath)) {
+              logger.info(`locateNodeBinary: Found node at ${nodePath} (via nvm)`);
+              cachedNodePath = nodePath;
+              return nodePath;
+            }
+          }
+        } catch (error) {
+          logger.debug(`locateNodeBinary: Error checking nvm directory: ${error}`);
+        }
+      }
+    }
+    
+    logger.warn('locateNodeBinary: Could not locate node binary via auto-detection');
+    return null;
+  } catch (error) {
+    logger.error('locateNodeBinary: Error during lookup', error);
+    return null;
+  }
+}
+
+async function getNodeBinaryPath(): Promise<string> {
+  const resolvedPath = await locateNodeBinary();
+  
+  if (resolvedPath) {
+    return resolvedPath;
+  }
+  
+  const userProvidedPath = vscode.workspace.getConfiguration('zapper').get<string>('nodePath');
+  if (userProvidedPath && userProvidedPath.trim() !== '') {
+    const resolvedUserPath = path.resolve(userProvidedPath.trim());
+    if (fs.existsSync(resolvedUserPath)) {
+      logger.debug(`getNodeBinaryPath: Using user-provided path: ${resolvedUserPath}`);
+      return resolvedUserPath;
+    }
+    logger.warn(`getNodeBinaryPath: User-provided path does not exist: ${resolvedUserPath}`);
+  }
+  
+  return process.execPath;
+}
+
+export async function getNodePath(): Promise<string> {
+  return await getNodeBinaryPath();
+}
+
+export function getNodePathSync(): string {
+  if (cachedNodePath) {
+    return cachedNodePath;
+  }
+  
+  const userProvidedPath = vscode.workspace.getConfiguration('zapper').get<string>('nodePath');
+  if (userProvidedPath && userProvidedPath.trim() !== '') {
+    return userProvidedPath.trim();
+  }
+  
+  const isWindows = os.platform() === 'win32';
+  try {
+    const whichCommand = isWindows ? 'where' : 'which';
+    const result = execSync(`${whichCommand} node`, { encoding: 'utf-8', timeout: 1000 }).trim();
+    if (result && fs.existsSync(result)) {
+      cachedNodePath = result;
+      return result;
+    }
+  } catch (error) {
+    logger.debug(`getNodePathSync: Could not locate node via ${isWindows ? 'where' : 'which'}`);
+  }
+  
+  return process.execPath;
+}
+
+export function isUsingCustomNodePath(): boolean {
+  const nodePath = vscode.workspace.getConfiguration('zapper').get<string>('nodePath');
+  return Boolean(nodePath && nodePath.trim() !== '');
 }
 
 export async function getAllZapperStatuses(): Promise<ZapperProject[]> {
@@ -322,13 +685,13 @@ export async function openTerminalAndRunCommand(command: string, projectPath: st
 }
 
 export async function openLogsTerminal(projectPath: string, serviceName: string): Promise<void> {
-  const zapCommand = getZapPath();
+  const zapCommand = await getZapPath();
   const command = `${zapCommand} logs ${serviceName}`;
   await openTerminalAndRunCommand(command, projectPath, `Logs: ${serviceName}`);
 }
 
 export async function openTaskTerminal(projectPath: string, taskName: string): Promise<void> {
-  const zapCommand = getZapPath();
+  const zapCommand = await getZapPath();
   const command = `${zapCommand} task ${taskName}`;
   await openTerminalAndRunCommand(command, projectPath, `Task: ${taskName}`);
 }
