@@ -4,6 +4,10 @@
   "description": "VS Code extension for managing local development with zapper CLI",
   "version": "0.3.0",
   "publisher": "felixsebastian",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felixsebastian/zapper-vscode.git"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,7 +21,7 @@
     "Other"
   ],
   "activationEvents": [
-    "*"
+    "onView:zapper"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -177,6 +181,7 @@
     "watch": "tsc -watch -p ./",
     "build": "npm run compile && vsce package",
     "package": "vsce package",
+    "buildpack": "npm run compile && vsce package",
     "install-extension": "code --install-extension zapper-vscode-0.0.1.vsix"
   },
   "dependencies": {
