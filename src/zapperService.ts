@@ -677,7 +677,7 @@ export async function enableProfile(projectPath: string, profileName: string): P
 
 export async function disableProfile(projectPath: string): Promise<void> {
   try {
-    await executeZapCommand(`profile disable`, projectPath);
+    await executeZapCommand(`profile --disable`, projectPath);
   } catch (error) {
     logger.error(`Failed to disable profile`, error);
     throw error;
