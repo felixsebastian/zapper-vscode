@@ -668,7 +668,7 @@ export async function getAllZapperStatuses(): Promise<ZapperProject[]> {
 
 export async function enableProfile(projectPath: string, profileName: string): Promise<void> {
   try {
-    await executeZapCommand(`profile enable ${profileName}`, projectPath);
+    await executeZapCommand(`profile ${profileName}`, projectPath);
   } catch (error) {
     logger.error(`Failed to enable profile ${profileName}`, error);
     throw error;
