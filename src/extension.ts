@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ZapperProvider } from './zapperProvider';
-import { startService, stopService, restartService, openLogsTerminal, openTaskTerminal, openServiceTerminal, startAllServices, stopAllServices, restartAllServices, ZapperProject } from './zapperService';
+import { startService, stopService, restartService, openLogsTerminal, openTaskTerminal, openServiceTerminal, startAllServices, stopAllServices, restartAllServices, enableProfile, disableProfile, ZapperProject } from './zapperService';
 import { logger } from './logger';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -292,6 +292,40 @@ export function activate(context: vscode.ExtensionContext) {
     } catch (error) {
       logger.error('Failed to view tasks', error);
       vscode.window.showErrorMessage(`Failed to view tasks: ${error}`);
+    }
+  });
+
+  vscode.commands.registerCommand('zapper.enableProfile', async (item) => {
+    logger.info(`Enable profile command triggered with item: ${item?.label} in ${item?.projectPath}`);
+    if (item && item.projectPath && item.label) {
+      try {
+        // Extract profile name (remove "(active)" if present)
+        const profileName = item.label.replace(' (active)', '');
+        await enableProfile(item.projectPath, profileName);
+        vscode.window.showInformationMessage(`Enabled profile ${profileName}`);
+        provider.refresh();
+      } catch (error) {
+        logger.error(`Failed to enable profile ${item.label}`, error);
+        vscode.window.showErrorMessage(`Failed to enable profile ${item.label}: ${error}`);
+      }
+    } else {
+      vscode.window.showErrorMessage('No profile selected');
+    }
+  });
+
+  vscode.commands.registerCommand('zapper.disableProfile', async (item) => {
+    logger.info(`Disable profile command triggered with item: ${item?.label} in ${item?.projectPath}`);
+    if (item && item.projectPath) {
+      try {
+        await disableProfile(item.projectPath);
+        vscode.window.showInformationMessage('Disabled profile');
+        provider.refresh();
+      } catch (error) {
+        logger.error(`Failed to disable profile`, error);
+        vscode.window.showErrorMessage(`Failed to disable profile: ${error}`);
+      }
+    } else {
+      vscode.window.showErrorMessage('No profile selected');
     }
   });
 

@@ -34,6 +34,10 @@ export const TaskNameSchema = z.object({
   name: z.string()
 });
 
+export const ProfileNameSchema = z.object({
+  name: z.string()
+});
+
 export const ZapperConfigSchema = z.object({
   projectName: z.string(),
   projectRoot: z.string(),
@@ -49,13 +53,22 @@ export const ZapperStatusSchema = z.object({
 });
 
 export const ZapperTasksSchema = z.array(TaskNameSchema);
+export const ZapperProfilesSchema = z.array(z.string());
+
+export const ZapperStateSchema = z.object({
+  activeProfile: z.string().nullable(),
+  lastUpdated: z.string()
+});
 
 export type ServiceStatus = z.infer<typeof ServiceStatusSchema>;
 export type Process = z.infer<typeof ProcessSchema>;
 export type Container = z.infer<typeof ContainerSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type TaskName = z.infer<typeof TaskNameSchema>;
+export type ProfileName = z.infer<typeof ProfileNameSchema>;
 export type ZapperConfig = z.infer<typeof ZapperConfigSchema>;
 export type ZapperStatus = z.infer<typeof ZapperStatusSchema>;
 export type ZapperTasks = z.infer<typeof ZapperTasksSchema>;
+export type ZapperProfiles = z.infer<typeof ZapperProfilesSchema>;
+export type ZapperState = z.infer<typeof ZapperStateSchema>;
 

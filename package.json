@@ -122,6 +122,16 @@
         "command": "zapper.viewTasks",
         "title": "View Tasks",
         "icon": "$(list-unordered)"
+      },
+      {
+        "command": "zapper.enableProfile",
+        "title": "Enable",
+        "icon": "$(check)"
+      },
+      {
+        "command": "zapper.disableProfile",
+        "title": "Disable",
+        "icon": "$(close)"
       }
     ],
     "menus": {
@@ -191,6 +201,16 @@
         {
           "command": "zapper.restartAll",
           "when": "viewItem == project",
+          "group": "inline"
+        },
+        {
+          "command": "zapper.enableProfile",
+          "when": "viewItem == profile-inactive",
+          "group": "inline"
+        },
+        {
+          "command": "zapper.disableProfile",
+          "when": "viewItem == profile-active",
           "group": "inline"
         }
       ]

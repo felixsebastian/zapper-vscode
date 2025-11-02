@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
 import * as os from 'os';
-import { ZapperStatus, ZapperStatusSchema, ZapperTasks, ZapperTasksSchema, ZapperConfig, ZapperConfigSchema } from './types';
+import { ZapperStatus, ZapperStatusSchema, ZapperTasks, ZapperTasksSchema, ZapperProfiles, ZapperProfilesSchema, ZapperState, ZapperStateSchema, ZapperConfig, ZapperConfigSchema } from './types';
 import { logger } from './logger';
 
 export interface ZapperProject {
@@ -11,6 +11,8 @@ export interface ZapperProject {
   name: string;
   status: ZapperStatus | null;
   tasks: ZapperTasks | null;
+  profiles: ZapperProfiles | null;
+  activeProfile: string | null;
 }
 
 let cachedZapPath: string | null = null;
@@ -40,7 +42,9 @@ export async function findZapperProjects(): Promise<ZapperProject[]> {
           rootPath: folder.uri.fsPath,
           name: `${folder.name} (${folder.uri.fsPath})`,
           status: null,
-          tasks: null
+          tasks: null,
+          profiles: null,
+          activeProfile: null
         });
       } else {
         logger.debug(`findZapperProjects: No zap.yaml found in ${folder.uri.fsPath}`);
@@ -64,7 +68,9 @@ export async function findZapperProjects(): Promise<ZapperProject[]> {
           rootPath: currentDir,
           name: `Current Directory (${currentDir})`,
           status: null,
-          tasks: null
+          tasks: null,
+          profiles: null,
+          activeProfile: null
         });
       } else {
         logger.debug(`findZapperProjects: No zap.yaml found in current directory ${currentDir}`);
@@ -407,6 +413,58 @@ export async function getZapperTasksForProject(project: ZapperProject): Promise<
   }
 }
 
+export async function getZapperProfilesForProject(project: ZapperProject): Promise<ZapperProfiles | null> {
+  logger.info(`getZapperProfilesForProject: Getting profiles for ${project.name}`);
+  try {
+    const output = await executeZapCommand('profile --list --json', project.rootPath);
+    logger.debug(`getZapperProfilesForProject: Raw output length: ${output.length}`);
+    logger.debug(`getZapperProfilesForProject: Raw output preview: ${output.substring(0, 200)}...`);
+    
+    const rawData = JSON.parse(output);
+    logger.debug(`getZapperProfilesForProject: Parsed JSON data: ${JSON.stringify(rawData)}`);
+    
+    // Validate the data with Zod
+    const validationResult = ZapperProfilesSchema.safeParse(rawData);
+    
+    if (!validationResult.success) {
+      logger.error(`Invalid zapper profiles data for ${project.name}`, validationResult.error);
+      return null;
+    }
+    
+    logger.debug(`getZapperProfilesForProject: Validation successful for ${project.name}`);
+    return validationResult.data;
+  } catch (error) {
+    logger.error(`Failed to get zapper profiles for ${project.name}`, error);
+    return null;
+  }
+}
+
+export async function getZapperStateForProject(project: ZapperProject): Promise<ZapperState | null> {
+  logger.info(`getZapperStateForProject: Getting state for ${project.name}`);
+  try {
+    const output = await executeZapCommand('state', project.rootPath);
+    logger.debug(`getZapperStateForProject: Raw output length: ${output.length}`);
+    logger.debug(`getZapperStateForProject: Raw output preview: ${output.substring(0, 200)}...`);
+    
+    const rawData = JSON.parse(output);
+    logger.debug(`getZapperStateForProject: Parsed JSON data: ${JSON.stringify(rawData)}`);
+    
+    // Validate the data with Zod
+    const validationResult = ZapperStateSchema.safeParse(rawData);
+    
+    if (!validationResult.success) {
+      logger.error(`Invalid zapper state data for ${project.name}`, validationResult.error);
+      return null;
+    }
+    
+    logger.debug(`getZapperStateForProject: Validation successful for ${project.name}`);
+    return validationResult.data;
+  } catch (error) {
+    logger.error(`Failed to get zapper state for ${project.name}`, error);
+    return null;
+  }
+}
+
 export async function getZapperConfigForProject(project: ZapperProject): Promise<ZapperConfig | null> {
   try {
     const output = await executeZapCommand('config --pretty', project.rootPath);
@@ -589,20 +647,41 @@ export async function getAllZapperStatuses(): Promise<ZapperProject[]> {
   const projects = await findZapperProjects();
   logger.debug(`getAllZapperStatuses: Found ${projects.length} projects`);
   
-  // Get status and tasks for each project in parallel
+  // Get status, tasks, profiles, and state for each project in parallel
   const statusPromises = projects.map(async (project) => {
     logger.debug(`getAllZapperStatuses: Processing project ${project.name}`);
-    const [status, tasks] = await Promise.all([
+    const [status, tasks, profiles, state] = await Promise.all([
       getZapperStatusForProject(project),
-      getZapperTasksForProject(project)
+      getZapperTasksForProject(project),
+      getZapperProfilesForProject(project),
+      getZapperStateForProject(project)
     ]);
-    logger.debug(`getAllZapperStatuses: Project ${project.name} - status: ${status ? 'found' : 'null'}, tasks: ${tasks ? 'found' : 'null'}`);
-    return { ...project, status, tasks };
+    const activeProfile = state?.activeProfile || null;
+    logger.debug(`getAllZapperStatuses: Project ${project.name} - status: ${status ? 'found' : 'null'}, tasks: ${tasks ? 'found' : 'null'}, profiles: ${profiles ? 'found' : 'null'}, activeProfile: ${activeProfile || 'null'}`);
+    return { ...project, status, tasks, profiles, activeProfile };
   });
   
   const result = await Promise.all(statusPromises);
   logger.info(`getAllZapperStatuses: Returning ${result.length} projects with data`);
   return result;
+}
+
+export async function enableProfile(projectPath: string, profileName: string): Promise<void> {
+  try {
+    await executeZapCommand(`profile enable ${profileName}`, projectPath);
+  } catch (error) {
+    logger.error(`Failed to enable profile ${profileName}`, error);
+    throw error;
+  }
+}
+
+export async function disableProfile(projectPath: string): Promise<void> {
+  try {
+    await executeZapCommand(`profile disable`, projectPath);
+  } catch (error) {
+    logger.error(`Failed to disable profile`, error);
+    throw error;
+  }
 }
 
 export async function startService(projectPath: string, serviceName: string): Promise<void> {
@@ -703,7 +782,9 @@ export async function openServiceTerminal(projectPath: string, serviceName: stri
       rootPath: projectPath,
       name: 'temp', // We don't need the name for config fetching
       status: null,
-      tasks: null
+      tasks: null,
+      profiles: null,
+      activeProfile: null
     };
     
     const config = await getZapperConfigForProject(project);
