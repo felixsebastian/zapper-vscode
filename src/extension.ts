@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ZapperProvider } from './zapperProvider';
-import { startService, stopService, restartService, openLogsTerminal, openTaskTerminal, openServiceTerminal, startAllServices, stopAllServices, restartAllServices } from './zapperService';
+import { startService, stopService, restartService, openLogsTerminal, openTaskTerminal, openServiceTerminal, startAllServices, stopAllServices, restartAllServices, ZapperProject } from './zapperService';
 import { logger } from './logger';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -17,7 +17,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   vscode.commands.registerCommand('zapper.toggleService', async (item) => {
-    logger.info(`Toggle command triggered with item: ${JSON.stringify(item)}`);
+    logger.info(`Toggle command triggered with item: ${item?.label} (${item?.status}) in ${item?.projectPath}`);
     if (item && item.projectPath && item.label && item.status) {
       try {
         if (item.status === 'up') {
@@ -38,7 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   vscode.commands.registerCommand('zapper.start', async (item) => {
-    logger.info(`Start command triggered with item: ${JSON.stringify(item)}`);
+    logger.info(`Start command triggered with item: ${item?.label} in ${item?.projectPath}`);
     if (item && item.projectPath && item.label) {
       try {
         await startService(item.projectPath, item.label);
@@ -54,7 +54,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   vscode.commands.registerCommand('zapper.stop', async (item) => {
-    logger.info(`Stop command triggered with item: ${JSON.stringify(item)}`);
+    logger.info(`Stop command triggered with item: ${item?.label} in ${item?.projectPath}`);
     if (item && item.projectPath && item.label) {
       try {
         await stopService(item.projectPath, item.label);
@@ -68,7 +68,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   vscode.commands.registerCommand('zapper.restart', async (item) => {
-    logger.info(`Restart command triggered with item: ${JSON.stringify(item)}`);
+    logger.info(`Restart command triggered with item: ${item?.label} in ${item?.projectPath}`);
     if (item && item.projectPath && item.label) {
       try {
         await restartService(item.projectPath, item.label);
@@ -82,7 +82,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   vscode.commands.registerCommand('zapper.runTask', async (item) => {
-    logger.info(`Run task command triggered with item: ${JSON.stringify(item)}`);
+    logger.info(`Run task command triggered with item: ${item?.label} in ${item?.projectPath}`);
     if (item && item.projectPath && item.label) {
       try {
         await openTaskTerminal(item.projectPath, item.label);
@@ -95,7 +95,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   vscode.commands.registerCommand('zapper.openLogs', async (item) => {
-    logger.info(`Open logs command triggered with item: ${JSON.stringify(item)}`);
+    logger.info(`Open logs command triggered with item: ${item?.label} in ${item?.projectPath}`);
     if (item && item.projectPath && item.label) {
       try {
         await openLogsTerminal(item.projectPath, item.label);
@@ -108,7 +108,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   vscode.commands.registerCommand('zapper.openTerminal', async (item) => {
-    logger.info(`Open terminal command triggered with item: ${JSON.stringify(item)}`);
+    logger.info(`Open terminal command triggered with item: ${item?.label} in ${item?.projectPath}`);
     if (item && item.projectPath && item.label) {
       try {
         await openServiceTerminal(item.projectPath, item.label);
@@ -236,6 +236,63 @@ export function activate(context: vscode.ExtensionContext) {
 
   vscode.commands.registerCommand('zapper.showLogs', () => {
     logger.show();
+  });
+
+  vscode.commands.registerCommand('zapper.viewTasks', async () => {
+    logger.info('View tasks command triggered');
+    try {
+      const { getAllZapperStatuses } = await import('./zapperService');
+      const projects = await getAllZapperStatuses();
+      
+      if (projects.length === 0) {
+        vscode.window.showWarningMessage('No zapper projects found');
+        return;
+      }
+      
+      let selectedProject: ZapperProject | undefined;
+      
+      if (projects.length === 1) {
+        selectedProject = projects[0];
+      } else {
+        const projectNames = projects.map(p => p.name);
+        const selectedProjectName = await vscode.window.showQuickPick(projectNames, {
+          placeHolder: 'Select a project to view tasks'
+        });
+        
+        if (!selectedProjectName) {
+          return;
+        }
+        
+        selectedProject = projects.find(p => p.name === selectedProjectName);
+      }
+      
+      if (!selectedProject) {
+        return;
+      }
+      
+      // Get tasks for the selected project
+      const { getZapperTasksForProject } = await import('./zapperService');
+      const tasks = await getZapperTasksForProject(selectedProject);
+      
+      if (!tasks || tasks.length === 0) {
+        vscode.window.showInformationMessage('No tasks found');
+        return;
+      }
+      
+      // Show tasks in quick pick
+      const taskNames = tasks.map(t => t.name);
+      const selectedTask = await vscode.window.showQuickPick(taskNames, {
+        placeHolder: 'Select a task to run'
+      });
+      
+      if (selectedTask) {
+        await openTaskTerminal(selectedProject.rootPath, selectedTask);
+        vscode.window.showInformationMessage(`Running task ${selectedTask}`);
+      }
+    } catch (error) {
+      logger.error('Failed to view tasks', error);
+      vscode.window.showErrorMessage(`Failed to view tasks: ${error}`);
+    }
   });
 
   // Clean up polling when extension deactivates

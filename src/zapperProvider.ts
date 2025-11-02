@@ -73,21 +73,26 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
       if (this.projects.length === 0) {
         logger.info('No projects found, showing placeholder');
         items.push(new ZapperItem('No zapper projects found', vscode.TreeItemCollapsibleState.None));
-      } else if (this.projects.length === 1) {
-        // Single project: show 3 sections directly
-        const project = this.projects[0];
-        items.push(new ZapperItem('💾 Bare Metal', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'bareMetal'));
-        items.push(new ZapperItem('🐳 Docker', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'docker'));
-        items.push(new ZapperItem('▶️ Tasks', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'tasks'));
-        logger.debug(`Single project: showing 3 sections`);
       } else {
-        // Multiple projects: show project headers for nesting
-        logger.debug(`Found ${this.projects.length} projects, using nesting`);
-        this.projects.forEach(project => {
-          if (project.status || project.tasks) {
-            items.push(new ZapperItem(project.name, vscode.TreeItemCollapsibleState.Expanded, 'project'));
-          }
-        });
+        // Add Commands section at the top
+        items.push(new ZapperItem('📡 Commands', vscode.TreeItemCollapsibleState.Expanded, 'section', undefined, undefined, undefined, 'commands'));
+        
+        if (this.projects.length === 1) {
+          // Single project: show 3 sections directly
+          const project = this.projects[0];
+          items.push(new ZapperItem('💾 Bare Metal', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'bareMetal'));
+          items.push(new ZapperItem('🐳 Docker', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'docker'));
+          items.push(new ZapperItem('▶️ Tasks', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'tasks'));
+          logger.debug(`Single project: showing 3 sections`);
+        } else {
+          // Multiple projects: show project headers for nesting
+          logger.debug(`Found ${this.projects.length} projects, using nesting`);
+          this.projects.forEach(project => {
+            if (project.status || project.tasks) {
+              items.push(new ZapperItem(project.name, vscode.TreeItemCollapsibleState.Expanded, 'project'));
+            }
+          });
+        }
       }
       
       logger.debug(`Returning ${items.length} items`);
@@ -124,6 +129,15 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
       }
     } else if (element.type === 'section') {
       // Return items for this section
+      if (element.sectionType === 'commands') {
+        const items: ZapperItem[] = [];
+        items.push(new ZapperItem('Start All', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'startAll'));
+        items.push(new ZapperItem('Stop All', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'stopAll'));
+        items.push(new ZapperItem('Restart All', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'restartAll'));
+        items.push(new ZapperItem('View Tasks', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'viewTasks'));
+        return Promise.resolve(items);
+      }
+      
       const project = this.projects.find(p => p.name === element.projectName);
       if (project) {
         const items: ZapperItem[] = [];
@@ -154,11 +168,12 @@ class ZapperItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-    public readonly type: 'project' | 'section' | 'service' | 'task' | 'info' | 'debug' | 'debugInfo' = 'service',
+    public readonly type: 'project' | 'section' | 'service' | 'task' | 'info' | 'debug' | 'debugInfo' | 'command' = 'service',
     public readonly projectName?: string,
     public readonly status?: string,
     public readonly projectPath?: string,
-    public readonly sectionType?: 'bareMetal' | 'docker' | 'tasks'
+    public readonly sectionType?: 'bareMetal' | 'docker' | 'tasks' | 'commands',
+    public readonly commandType?: 'startAll' | 'stopAll' | 'restartAll' | 'viewTasks'
   ) {
     super(label, collapsibleState);
     
@@ -206,8 +221,34 @@ class ZapperItem extends vscode.TreeItem {
       this.command = {
         command: 'zapper.runTask',
         title: 'Run Task',
-        arguments: [this]
+        arguments: [{ projectPath: this.projectPath, label: this.label }]
       };
+    } else if (type === 'command') {
+      this.contextValue = 'command';
+      this.iconPath = new vscode.ThemeIcon('run');
+      
+      // Add command based on commandType
+      if (commandType === 'startAll') {
+        this.command = {
+          command: 'zapper.startAll',
+          title: 'Start All'
+        };
+      } else if (commandType === 'stopAll') {
+        this.command = {
+          command: 'zapper.stopAll',
+          title: 'Stop All'
+        };
+      } else if (commandType === 'restartAll') {
+        this.command = {
+          command: 'zapper.restartAll',
+          title: 'Restart All'
+        };
+      } else if (commandType === 'viewTasks') {
+        this.command = {
+          command: 'zapper.viewTasks',
+          title: 'View Tasks'
+        };
+      }
     }
   }
 }

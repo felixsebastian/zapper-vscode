@@ -2,7 +2,7 @@
   "name": "zapper-vscode",
   "displayName": "Zapper",
   "description": "VS Code extension for managing local development with zapper CLI",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publisher": "felixsebastian",
   "repository": {
     "type": "git",
@@ -117,6 +117,11 @@
         "command": "zapper.showLogs",
         "title": "Show Output Logs",
         "icon": "$(output)"
+      },
+      {
+        "command": "zapper.viewTasks",
+        "title": "View Tasks",
+        "icon": "$(list-unordered)"
       }
     ],
     "menus": {
