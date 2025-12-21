@@ -15,6 +15,25 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
     this.startPolling();
   }
 
+  private icon(name: string): { light: vscode.Uri; dark: vscode.Uri } {
+    return {
+      light: vscode.Uri.joinPath(this.extensionUri, 'resources', 'icons', 'light', `${name}.svg`),
+      dark: vscode.Uri.joinPath(this.extensionUri, 'resources', 'icons', 'dark', `${name}.svg`),
+    };
+  }
+
+  private hasBareMetal(project: ZapperProject): boolean {
+    return Boolean(project.status?.bareMetal?.length);
+  }
+
+  private hasDocker(project: ZapperProject): boolean {
+    return Boolean(project.status?.docker?.length);
+  }
+
+  private hasTasks(project: ZapperProject): boolean {
+    return Boolean(project.tasks?.length);
+  }
+
   private startPolling(): void {
     this.pollStatus();
     this.pollingInterval = setInterval(() => {
@@ -60,40 +79,40 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
       const debugMode = vscode.workspace.getConfiguration('zapper').get<boolean>('debugMode', false);
       
       if (debugMode) {
-        const zapPath = getZapPathSync();
-        items.push(new ZapperItem('Debug Info', vscode.TreeItemCollapsibleState.Expanded, 'debug'));
+        items.push(new ZapperItem('Debug Info', vscode.TreeItemCollapsibleState.Expanded, 'debug', undefined, undefined, undefined, undefined, undefined, this.icon('bug')));
       }
       
       // Add custom path indicator at the top if using custom path (only if not in debug mode)
       if (!debugMode && isUsingCustomPath()) {
         const zapPath = getZapPathSync();
-        items.push(new ZapperItem(`Using: ${zapPath}`, vscode.TreeItemCollapsibleState.None, 'info'));
+        items.push(new ZapperItem(`Using: ${zapPath}`, vscode.TreeItemCollapsibleState.None, 'info', undefined, undefined, undefined, undefined, undefined, this.icon('info')));
       }
       
       if (this.projects.length === 0) {
         logger.info('No projects found, showing placeholder');
-        items.push(new ZapperItem('No zapper projects found', vscode.TreeItemCollapsibleState.None));
+        items.push(new ZapperItem('No zapper projects found', vscode.TreeItemCollapsibleState.None, 'info', undefined, undefined, undefined, undefined, undefined, this.icon('info')));
       } else {
         // Add Commands section at the top
-        items.push(new ZapperItem('📡 Commands', vscode.TreeItemCollapsibleState.Expanded, 'section', undefined, undefined, undefined, 'commands'));
+        items.push(new ZapperItem('Commands', vscode.TreeItemCollapsibleState.Expanded, 'section', undefined, undefined, undefined, 'commands', undefined, this.icon('section')));
         
         if (this.projects.length === 1) {
           // Single project: show sections directly
           const project = this.projects[0];
-          items.push(new ZapperItem('💾 Bare Metal', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'bareMetal'));
-          items.push(new ZapperItem('🐳 Docker', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'docker'));
-          items.push(new ZapperItem('▶️ Tasks', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'tasks'));
+          if (this.hasBareMetal(project))
+            items.push(new ZapperItem('Native', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'bareMetal', undefined, this.icon('section')));
+          if (this.hasDocker(project))
+            items.push(new ZapperItem('Docker', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'docker', undefined, this.icon('section')));
+          if (this.hasTasks(project))
+            items.push(new ZapperItem('Tasks', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'tasks', undefined, this.icon('tasks')));
           if (project.profiles && project.profiles.length > 0) {
-            items.push(new ZapperItem('🧩 Profiles', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'profiles'));
+            items.push(new ZapperItem('Profiles', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'profiles', undefined, this.icon('profiles')));
           }
           logger.debug(`Single project: showing sections`);
         } else {
           // Multiple projects: show project headers for nesting
           logger.debug(`Found ${this.projects.length} projects, using nesting`);
           this.projects.forEach(project => {
-            if (project.status || project.tasks || project.profiles) {
-              items.push(new ZapperItem(project.name, vscode.TreeItemCollapsibleState.Expanded, 'project'));
-            }
+            items.push(new ZapperItem(project.name, vscode.TreeItemCollapsibleState.Expanded, 'project', undefined, undefined, undefined, undefined, undefined, this.icon('project')));
           });
         }
       }
@@ -107,15 +126,15 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
       const nodePath = getNodePathSync();
       const usingCustomNodePath = isUsingCustomNodePath();
       
-      items.push(new ZapperItem(`Zap Command: ${zapPath}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
-      items.push(new ZapperItem(`Using Custom Zap Path: ${usingCustomPath ? 'Yes' : 'No'}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
-      items.push(new ZapperItem(`Node Path: ${nodePath}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
-      items.push(new ZapperItem(`Using Custom Node Path: ${usingCustomNodePath ? 'Yes' : 'No'}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
-      items.push(new ZapperItem(`Projects Found: ${this.projects.length}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
+      items.push(new ZapperItem(`Zap Command: ${zapPath}`, vscode.TreeItemCollapsibleState.None, 'debugInfo', undefined, undefined, undefined, undefined, undefined, this.icon('info')));
+      items.push(new ZapperItem(`Using Custom Zap Path: ${usingCustomPath ? 'Yes' : 'No'}`, vscode.TreeItemCollapsibleState.None, 'debugInfo', undefined, undefined, undefined, undefined, undefined, this.icon('info')));
+      items.push(new ZapperItem(`Node Path: ${nodePath}`, vscode.TreeItemCollapsibleState.None, 'debugInfo', undefined, undefined, undefined, undefined, undefined, this.icon('info')));
+      items.push(new ZapperItem(`Using Custom Node Path: ${usingCustomNodePath ? 'Yes' : 'No'}`, vscode.TreeItemCollapsibleState.None, 'debugInfo', undefined, undefined, undefined, undefined, undefined, this.icon('info')));
+      items.push(new ZapperItem(`Projects Found: ${this.projects.length}`, vscode.TreeItemCollapsibleState.None, 'debugInfo', undefined, undefined, undefined, undefined, undefined, this.icon('info')));
       
       if (this.projects.length > 0) {
         this.projects.forEach((project, index) => {
-          items.push(new ZapperItem(`Project ${index + 1}: ${project.rootPath}`, vscode.TreeItemCollapsibleState.None, 'debugInfo'));
+          items.push(new ZapperItem(`Project ${index + 1}: ${project.rootPath}`, vscode.TreeItemCollapsibleState.None, 'debugInfo', undefined, undefined, undefined, undefined, undefined, this.icon('info')));
         });
       }
       
@@ -125,11 +144,14 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
       const project = this.projects.find(p => p.name === element.label);
       if (project) {
         const items: ZapperItem[] = [];
-        items.push(new ZapperItem('💾 Bare Metal', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'bareMetal'));
-        items.push(new ZapperItem('🐳 Docker', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'docker'));
-        items.push(new ZapperItem('▶️ Tasks', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'tasks'));
+        if (this.hasBareMetal(project))
+          items.push(new ZapperItem('Native', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'bareMetal', undefined, this.icon('section')));
+        if (this.hasDocker(project))
+          items.push(new ZapperItem('Docker', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'docker', undefined, this.icon('section')));
+        if (this.hasTasks(project))
+          items.push(new ZapperItem('Tasks', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'tasks', undefined, this.icon('tasks')));
         if (project.profiles && project.profiles.length > 0) {
-          items.push(new ZapperItem('🧩 Profiles', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'profiles'));
+          items.push(new ZapperItem('Profiles', vscode.TreeItemCollapsibleState.Expanded, 'section', project.name, undefined, project.rootPath, 'profiles', undefined, this.icon('profiles')));
         }
         return Promise.resolve(items);
       }
@@ -137,10 +159,10 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
       // Return items for this section
       if (element.sectionType === 'commands') {
         const items: ZapperItem[] = [];
-        items.push(new ZapperItem('Start All', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'startAll'));
-        items.push(new ZapperItem('Stop All', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'stopAll'));
-        items.push(new ZapperItem('Restart All', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'restartAll'));
-        items.push(new ZapperItem('View Tasks', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'viewTasks'));
+        items.push(new ZapperItem('Start All', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'startAll', this.icon('play')));
+        items.push(new ZapperItem('Stop All', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'stopAll', this.icon('stop-square')));
+        items.push(new ZapperItem('Restart All', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'restartAll', this.icon('restart')));
+        items.push(new ZapperItem('View Tasks', vscode.TreeItemCollapsibleState.None, 'command', undefined, undefined, undefined, undefined, 'viewTasks', this.icon('tasks')));
         return Promise.resolve(items);
       }
       
@@ -158,13 +180,13 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
           });
         } else if (element.sectionType === 'tasks' && project.tasks) {
           project.tasks.forEach(task => {
-            items.push(new ZapperItem(task.name as string, vscode.TreeItemCollapsibleState.None, 'task', project.name, undefined, project.rootPath));
+            items.push(new ZapperItem(task.name as string, vscode.TreeItemCollapsibleState.None, 'task', project.name, undefined, project.rootPath, undefined, undefined, this.icon('tasks')));
           });
         } else if (element.sectionType === 'profiles' && project.profiles) {
           project.profiles.forEach(profile => {
             const isActive = project.activeProfile === profile;
             const label = isActive ? `${profile} (active)` : profile;
-            items.push(new ZapperItem(label, vscode.TreeItemCollapsibleState.None, 'profile', project.name, isActive ? 'active' : 'inactive', project.rootPath));
+            items.push(new ZapperItem(label, vscode.TreeItemCollapsibleState.None, 'profile', project.name, isActive ? 'active' : 'inactive', project.rootPath, undefined, undefined, this.icon(isActive ? 'check' : 'profiles')));
           });
         }
         
@@ -185,9 +207,14 @@ class ZapperItem extends vscode.TreeItem {
     public readonly status?: string,
     public readonly projectPath?: string,
     public readonly sectionType?: 'bareMetal' | 'docker' | 'tasks' | 'profiles' | 'commands',
-    public readonly commandType?: 'startAll' | 'stopAll' | 'restartAll' | 'viewTasks'
+    public readonly commandType?: 'startAll' | 'stopAll' | 'restartAll' | 'viewTasks',
+    customIconPath?: { light: vscode.Uri; dark: vscode.Uri }
   ) {
     super(label, collapsibleState);
+
+    if (customIconPath) {
+      this.iconPath = customIconPath;
+    }
     
     if (type === 'project') {
       this.contextValue = 'project';
@@ -195,13 +222,10 @@ class ZapperItem extends vscode.TreeItem {
       this.contextValue = 'section';
     } else if (type === 'info') {
       this.contextValue = 'info';
-      this.iconPath = new vscode.ThemeIcon('info');
     } else if (type === 'debug') {
       this.contextValue = 'debug';
-      this.iconPath = new vscode.ThemeIcon('bug');
     } else if (type === 'debugInfo') {
       this.contextValue = 'debugInfo';
-      this.iconPath = new vscode.ThemeIcon('info');
     } else if (type === 'service') {
       this.contextValue = 'service';
       logger.debug(`Created service item with contextValue: ${this.contextValue}, status: ${status}`);
@@ -209,6 +233,8 @@ class ZapperItem extends vscode.TreeItem {
       // Set icon based on status
       if (status === 'up') {
         this.iconPath = new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('charts.green'));
+      } else if (status === 'pending') {
+        this.iconPath = new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('editorWarning.foreground'));
       } else if (status === 'down' || status === 'stopped') {
         this.iconPath = new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('charts.red'));
       } else {
@@ -219,15 +245,14 @@ class ZapperItem extends vscode.TreeItem {
       // Set context value for menu based on status
       if (status === 'up') {
         this.contextValue = 'service-running';
+      } else if (status === 'pending') {
+        this.contextValue = 'service-pending';
       } else {
         this.contextValue = 'service-stopped';
       }
     } else if (type === 'task') {
       this.contextValue = 'task';
       logger.debug(`Created task item with contextValue: ${this.contextValue}`);
-      
-      // Add icon for task items
-      this.iconPath = new vscode.ThemeIcon('play');
       
       // Add default command (click to run)
       this.command = {
@@ -240,12 +265,8 @@ class ZapperItem extends vscode.TreeItem {
       const isActive = status === 'active';
       this.contextValue = isActive ? 'profile-active' : 'profile-inactive';
       logger.debug(`Created profile item with contextValue: ${this.contextValue}`);
-      
-      // Add icon for profile items - check icon if active, settings icon otherwise
-      this.iconPath = new vscode.ThemeIcon(isActive ? 'check' : 'settings');
     } else if (type === 'command') {
       this.contextValue = 'command';
-      this.iconPath = new vscode.ThemeIcon('run');
       
       // Add command based on commandType
       if (commandType === 'startAll') {

@@ -4,7 +4,7 @@ export const ServiceStatusSchema = z.object({
   service: z.string(),
   rawName: z.string(),
   status: z.string(),
-  type: z.enum(['bare_metal', 'docker']),
+  type: z.enum(['native', 'bare_metal', 'docker']).transform(t => t === 'bare_metal' ? 'native' : t),
   cwd: z.string().optional()
 });
 
@@ -47,10 +47,16 @@ export const ZapperConfigSchema = z.object({
   tasks: z.array(TaskSchema)
 });
 
-export const ZapperStatusSchema = z.object({
-  bareMetal: z.array(ServiceStatusSchema),
-  docker: z.array(ServiceStatusSchema)
-});
+export const ZapperStatusSchema = z.preprocess(raw => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const obj = raw as Record<string, unknown>;
+  if (obj.bareMetal === undefined && obj.native !== undefined) return { ...obj, bareMetal: obj.native };
+  if (obj.bareMetal === undefined && obj.bare_metal !== undefined) return { ...obj, bareMetal: obj.bare_metal };
+  return raw;
+}, z.object({
+  bareMetal: z.array(ServiceStatusSchema).default([]),
+  docker: z.array(ServiceStatusSchema).default([])
+}));
 
 export const ZapperTasksSchema = z.array(TaskNameSchema);
 export const ZapperProfilesSchema = z.array(z.string());

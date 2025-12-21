@@ -46,7 +46,7 @@
         {
           "id": "zapper",
           "title": "Zapper",
-          "icon": "$(zap)"
+          "icon": "resources/icons/zapper.svg"
         }
       ]
     },
@@ -62,76 +62,122 @@
       {
         "command": "zapper.refresh",
         "title": "Refresh",
-        "icon": "$(refresh)"
+        "icon": {
+          "light": "resources/icons/light/refresh.svg",
+          "dark": "resources/icons/dark/refresh.svg"
+        }
       },
       {
         "command": "zapper.start",
         "title": "Start",
-        "icon": "$(play)"
+        "icon": {
+          "light": "resources/icons/light/play.svg",
+          "dark": "resources/icons/dark/play.svg"
+        }
       },
       {
         "command": "zapper.stop",
         "title": "Stop",
-        "icon": "$(primitive-square)"
+        "icon": {
+          "light": "resources/icons/light/stop-square.svg",
+          "dark": "resources/icons/dark/stop-square.svg"
+        }
       },
       {
         "command": "zapper.restart",
         "title": "Restart",
-        "icon": "$(refresh)"
+        "icon": {
+          "light": "resources/icons/light/restart.svg",
+          "dark": "resources/icons/dark/restart.svg"
+        }
       },
       {
         "command": "zapper.runTask",
-        "title": "Run"
+        "title": "Run",
+        "icon": {
+          "light": "resources/icons/light/play.svg",
+          "dark": "resources/icons/dark/play.svg"
+        }
       },
       {
         "command": "zapper.startAll",
         "title": "Start All",
-        "icon": "$(play)"
+        "icon": {
+          "light": "resources/icons/light/play.svg",
+          "dark": "resources/icons/dark/play.svg"
+        }
       },
       {
         "command": "zapper.stopAll",
         "title": "Stop All",
-        "icon": "$(primitive-square)"
+        "icon": {
+          "light": "resources/icons/light/stop-square.svg",
+          "dark": "resources/icons/dark/stop-square.svg"
+        }
       },
       {
         "command": "zapper.restartAll",
         "title": "Restart All",
-        "icon": "$(refresh)"
+        "icon": {
+          "light": "resources/icons/light/restart.svg",
+          "dark": "resources/icons/dark/restart.svg"
+        }
       },
       {
         "command": "zapper.openLogs",
         "title": "Logs",
-        "icon": "$(output)"
+        "icon": {
+          "light": "resources/icons/light/logs.svg",
+          "dark": "resources/icons/dark/logs.svg"
+        }
       },
       {
         "command": "zapper.openTerminal",
         "title": "Terminal",
-        "icon": "$(terminal)"
+        "icon": {
+          "light": "resources/icons/light/terminal.svg",
+          "dark": "resources/icons/dark/terminal.svg"
+        }
       },
       {
         "command": "zapper.openZapFile",
         "title": "Open zap.yaml",
-        "icon": "$(gear)"
+        "icon": {
+          "light": "resources/icons/light/zapfile.svg",
+          "dark": "resources/icons/dark/zapfile.svg"
+        }
       },
       {
         "command": "zapper.showLogs",
         "title": "Show Output Logs",
-        "icon": "$(output)"
+        "icon": {
+          "light": "resources/icons/light/logs.svg",
+          "dark": "resources/icons/dark/logs.svg"
+        }
       },
       {
         "command": "zapper.viewTasks",
         "title": "View Tasks",
-        "icon": "$(list-unordered)"
+        "icon": {
+          "light": "resources/icons/light/tasks.svg",
+          "dark": "resources/icons/dark/tasks.svg"
+        }
       },
       {
         "command": "zapper.enableProfile",
         "title": "Enable",
-        "icon": "$(check)"
+        "icon": {
+          "light": "resources/icons/light/check.svg",
+          "dark": "resources/icons/dark/check.svg"
+        }
       },
       {
         "command": "zapper.disableProfile",
         "title": "Disable",
-        "icon": "$(close)"
+        "icon": {
+          "light": "resources/icons/light/close.svg",
+          "dark": "resources/icons/dark/close.svg"
+        }
       }
     ],
     "menus": {
@@ -170,22 +216,22 @@
         },
         {
           "command": "zapper.stop",
-          "when": "viewItem == service-running",
+          "when": "viewItem == service-running || viewItem == service-pending",
           "group": "inline"
         },
         {
           "command": "zapper.restart",
-          "when": "viewItem == service-running",
+          "when": "viewItem == service-running || viewItem == service-pending",
           "group": "inline"
         },
         {
           "command": "zapper.openLogs",
-          "when": "viewItem == service-running",
+          "when": "viewItem == service-running || viewItem == service-pending",
           "group": "inline"
         },
         {
           "command": "zapper.openTerminal",
-          "when": "viewItem == service-running || viewItem == service-stopped",
+          "when": "viewItem == service-running || viewItem == service-stopped || viewItem == service-pending",
           "group": "inline"
         },
         {
