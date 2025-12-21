@@ -62,7 +62,7 @@ export const ZapperTasksSchema = z.array(TaskNameSchema);
 export const ZapperProfilesSchema = z.array(z.string());
 
 export const ZapperStateSchema = z.object({
-  activeProfile: z.string().nullable(),
+  activeProfile: z.string().optional().nullable(),
   lastUpdated: z.string()
 });
 

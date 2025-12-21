@@ -165,19 +165,11 @@
       },
       {
         "command": "zapper.enableProfile",
-        "title": "Enable",
-        "icon": {
-          "light": "resources/icons/light/check.svg",
-          "dark": "resources/icons/dark/check.svg"
-        }
+        "title": "Enable"
       },
       {
         "command": "zapper.disableProfile",
-        "title": "Disable",
-        "icon": {
-          "light": "resources/icons/light/close.svg",
-          "dark": "resources/icons/dark/close.svg"
-        }
+        "title": "Disable"
       }
     ],
     "menus": {
@@ -185,53 +177,48 @@
         {
           "command": "zapper.startAll",
           "when": "view == zapperView",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "command": "zapper.stopAll",
           "when": "view == zapperView",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "command": "zapper.restartAll",
           "when": "view == zapperView",
-          "group": "navigation"
+          "group": "navigation@3"
         },
         {
           "command": "zapper.openZapFile",
           "when": "view == zapperView",
-          "group": "navigation"
-        },
-        {
-          "command": "zapper.showLogs",
-          "when": "view == zapperView",
-          "group": "navigation"
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
         {
           "command": "zapper.start",
-          "when": "viewItem == service-stopped",
+          "when": "viewItem == native-service-stopped || viewItem == docker-service-stopped",
           "group": "inline"
         },
         {
           "command": "zapper.stop",
-          "when": "viewItem == service-running || viewItem == service-pending",
+          "when": "viewItem == native-service-running || viewItem == native-service-pending || viewItem == docker-service-running || viewItem == docker-service-pending",
           "group": "inline"
         },
         {
           "command": "zapper.restart",
-          "when": "viewItem == service-running || viewItem == service-pending",
+          "when": "viewItem == native-service-running || viewItem == native-service-pending || viewItem == docker-service-running || viewItem == docker-service-pending",
           "group": "inline"
         },
         {
           "command": "zapper.openLogs",
-          "when": "viewItem == service-running || viewItem == service-pending",
+          "when": "viewItem == native-service-running || viewItem == native-service-pending || viewItem == docker-service-running || viewItem == docker-service-pending",
           "group": "inline"
         },
         {
           "command": "zapper.openTerminal",
-          "when": "viewItem == service-running || viewItem == service-stopped || viewItem == service-pending",
+          "when": "viewItem == native-service-running || viewItem == native-service-stopped || viewItem == native-service-pending",
           "group": "inline"
         },
         {
@@ -275,9 +262,10 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/vscode": "^1.74.0",
+    "@fortawesome/fontawesome-free": "^7.1.0",
     "@types/node": "16.x",
-    "typescript": "^4.9.4",
-    "@vscode/vsce": "^2.19.0"
+    "@types/vscode": "^1.74.0",
+    "@vscode/vsce": "^2.19.0",
+    "typescript": "^4.9.4"
   }
 }
