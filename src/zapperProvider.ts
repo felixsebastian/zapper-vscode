@@ -9,6 +9,7 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
   
   private projects: ZapperProject[] = [];
   private pollingInterval: NodeJS.Timeout | undefined;
+  private isLoading: boolean = true;
 
   constructor(private extensionUri: vscode.Uri) {
     logger.info('ZapperProvider constructor called');
@@ -45,6 +46,7 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
     logger.info('ZapperProvider: Starting pollStatus');
     try {
       this.projects = await getAllZapperStatuses();
+      this.isLoading = false;
       logger.info(`ZapperProvider: Poll completed, got ${this.projects.length} projects`);
       this.projects.forEach((project, index) => {
         logger.debug(`ZapperProvider: Project ${index}: ${project.name}, status: ${project.status ? 'has status' : 'no status'}, tasks: ${project.tasks ? 'has tasks' : 'no tasks'}`);
@@ -52,6 +54,7 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
       this._onDidChangeTreeData.fire();
       logger.debug('ZapperProvider: Fired tree data change event');
     } catch (error) {
+      this.isLoading = false;
       logger.error('Failed to poll zapper status', error);
     }
   }
@@ -88,9 +91,12 @@ export class ZapperProvider implements vscode.TreeDataProvider<ZapperItem> {
         items.push(new ZapperItem(`Using: ${zapPath}`, vscode.TreeItemCollapsibleState.None, 'info', undefined, undefined, undefined, undefined, undefined, this.icon('info')));
       }
       
-      if (this.projects.length === 0) {
+      if (this.isLoading) {
+        logger.info('Still loading, showing loading message');
+        items.push(new ZapperItem('Loading...', vscode.TreeItemCollapsibleState.None, 'info'));
+      } else if (this.projects.length === 0) {
         logger.info('No projects found, showing placeholder');
-        items.push(new ZapperItem('No zapper projects found', vscode.TreeItemCollapsibleState.None, 'info', undefined, undefined, undefined, undefined, undefined, this.icon('info')));
+        items.push(new ZapperItem('No zapper projects found', vscode.TreeItemCollapsibleState.None, 'info'));
       } else {
         if (this.projects.length === 1) {
           // Single project: show sections directly
