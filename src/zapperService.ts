@@ -99,6 +99,7 @@ async function locateZapBinary(): Promise<string | null> {
     const isWindows = os.platform() === 'win32';
     const whichCommand = isWindows ? 'where' : 'which';
     
+    // First try direct which (may work if PATH is already set correctly)
     try {
       const result = execSync(`${whichCommand} zap`, { encoding: 'utf-8', timeout: 5000 }).trim();
       if (result && fs.existsSync(result)) {
@@ -107,13 +108,36 @@ async function locateZapBinary(): Promise<string | null> {
         return result;
       }
     } catch (error) {
-      logger.debug(`locateZapBinary: ${whichCommand} zap failed, trying alternative locations`);
+      logger.debug(`locateZapBinary: ${whichCommand} zap failed, trying login shell`);
+    }
+    
+    // Try running through a login shell to pick up user's PATH from shell init files
+    if (!isWindows) {
+      const userShell = vscode.env.shell || '/bin/zsh';
+      try {
+        const result = execSync(`${userShell} -l -c "${whichCommand} zap"`, { 
+          encoding: 'utf-8', 
+          timeout: 10000 
+        }).trim();
+        if (result && fs.existsSync(result)) {
+          logger.info(`locateZapBinary: Found zap at ${result} via login shell ${whichCommand}`);
+          cachedZapPath = result;
+          return result;
+        }
+      } catch (error) {
+        logger.debug(`locateZapBinary: Login shell ${whichCommand} zap failed, trying alternative locations`);
+      }
     }
     
     const homeDir = os.homedir();
     const commonPaths = [
       path.join(homeDir, '.local', 'bin', 'zap'),
       path.join(homeDir, '.npm-global', 'bin', 'zap'),
+      path.join(homeDir, 'Library', 'pnpm', 'zap'),
+      path.join(homeDir, '.local', 'share', 'pnpm', 'zap'),
+      path.join(homeDir, '.yarn', 'bin', 'zap'),
+      path.join(homeDir, '.config', 'yarn', 'global', 'node_modules', '.bin', 'zap'),
+      path.join(homeDir, '.cargo', 'bin', 'zap'),
       '/usr/local/bin/zap',
       '/opt/homebrew/bin/zap',
       path.join(path.dirname(process.execPath), 'zap'),
@@ -522,6 +546,7 @@ async function locateNodeBinary(): Promise<string | null> {
     const isWindows = os.platform() === 'win32';
     const whichCommand = isWindows ? 'where' : 'which';
     
+    // First try direct which (may work if PATH is already set correctly)
     try {
       const result = execSync(`${whichCommand} node`, { encoding: 'utf-8', timeout: 5000 }).trim();
       if (result && fs.existsSync(result)) {
@@ -530,7 +555,25 @@ async function locateNodeBinary(): Promise<string | null> {
         return result;
       }
     } catch (error) {
-      logger.debug(`locateNodeBinary: ${whichCommand} node failed, trying alternative locations`);
+      logger.debug(`locateNodeBinary: ${whichCommand} node failed, trying login shell`);
+    }
+    
+    // Try running through a login shell to pick up user's PATH from shell init files
+    if (!isWindows) {
+      const userShell = vscode.env.shell || '/bin/zsh';
+      try {
+        const result = execSync(`${userShell} -l -c "${whichCommand} node"`, { 
+          encoding: 'utf-8', 
+          timeout: 10000 
+        }).trim();
+        if (result && fs.existsSync(result)) {
+          logger.info(`locateNodeBinary: Found node at ${result} via login shell ${whichCommand}`);
+          cachedNodePath = result;
+          return result;
+        }
+      } catch (error) {
+        logger.debug(`locateNodeBinary: Login shell ${whichCommand} node failed, trying alternative locations`);
+      }
     }
     
     const homeDir = os.homedir();

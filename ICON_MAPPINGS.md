@@ -43,3 +43,7 @@ If you need to update or regenerate icons in the future, you can create a script
 5. Copy to both `resources/icons/dark/` and `resources/icons/light/` directories
 
 
+
+
+
+
